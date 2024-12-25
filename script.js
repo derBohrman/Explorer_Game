@@ -182,8 +182,7 @@ let rezept = {
 	"4g8": "5g1",
 	"0g8": "6g8",
 	"11g12": "12g13",
-	"12g13": "0g12",
-	"11g1":"12g13"
+	"12g13": "0g12"
 }
 let craft = {
 	"2i3": "4",
@@ -1127,7 +1126,7 @@ function findWay(startPos, zielPos) {
 		time++
 		let neu = []
 		for (let x = 0; x < changed.length; x++) {
-			for (let y = 0; y < 4; y++) {
+			for (let y = 0; y < 8; y++) {
 				let pos = posRich(changed[x], y, weltKante)
 				if (boden.includes(bodenTyp(pos)) && dis[pos] == -1) {
 					neu.push(pos)
@@ -1143,7 +1142,7 @@ function findWay(startPos, zielPos) {
 	}
 	let weg = Array(länge)
 	while (länge--) {
-		for (let x = 0; x < 4; x++) {
+		for (let x = 0; x < 8; x++) {
 			let pos = posRich(zielPos, x, weltKante)
 			if (dis[pos] == länge) {
 				zielPos = pos
@@ -1163,19 +1162,20 @@ function walk(weg) {
 	for (let x = 1; x < weg.length; x++) {
 		positions[x] = posRich(positions[x - 1], weg[x - 1], weltKante)
 	}
+	const walkSpeed = 150
 	let lastInd = weg.length - 1
 	let zielPos = posRich(positions[lastInd], weg[lastInd], weltKante)
 	let walkStart = Date.now()
 	walkId = setInterval(function () {
 		let deltaTime = Date.now() - walkStart
-		let x = ~~(deltaTime / 100)
+		let x = ~~(deltaTime / walkSpeed)
 		if (x >= weg.length) {
 			playerPos = zielPos
 			interrupt()
 		} else {
 			playerPos = positions[x]
-			xPlayerOff = env[weg[x] ^ 2][0] * (deltaTime % 100) / 100
-			yPlayerOff = env[weg[x] ^ 2][1] * (deltaTime % 100) / 100
+			xPlayerOff = env[weg[x] ^ 2][0] * (deltaTime % walkSpeed) / walkSpeed
+			yPlayerOff = env[weg[x] ^ 2][1] * (deltaTime % walkSpeed) / walkSpeed
 			updateScreen = true
 		}
 	})
@@ -1489,9 +1489,9 @@ function liegendeBeere(pos, time) {
 			chunk[1][chunkPos(pos)] = 11
 			updateScreen = true
 			chunk[0] = 0
-			return [pos,0,1]
+			return [pos, 0, 1]
 		} else {
-			return [pos,time+1,0]
+			return [pos, time + 1, 0]
 		}
 	}
 	return 0
@@ -1503,14 +1503,14 @@ function wachseBusch(pos, time) {
 			chunk[1][chunkPos(pos)] = 9
 			updateScreen = true
 			chunk[0] = 0
-			return [pos,0,2]
+			return [pos, 0, 2]
 		} else {
 			if (Math.random() < 0.8) {
-				return [pos,time+1,1]
+				return [pos, time + 1, 1]
 			} else {
 				chunk[1][chunkPos(pos)] = 1
 				updateScreen = true
-	 		chunk[0] = 0
+				chunk[0] = 0
 			}
 		}
 	}
@@ -1524,7 +1524,7 @@ function wachseBeeren(pos, time) {
 			updateScreen = true
 			chunk[0] = 0
 		} else {
-			return [pos,time+1,2]
+			return [pos, time + 1, 2]
 		}
 	}
 	return 0
@@ -1537,9 +1537,9 @@ function liegendeNuss(pos, time) {
 			chunk[1][chunkPos(pos)] = 10
 			updateScreen = true
 			chunk[0] = 0
-			return [pos,0,4]
+			return [pos, 0, 4]
 		} else {
-			return [pos, time+1,3]
+			return [pos, time + 1, 3]
 		}
 	}
 	return 0
@@ -1553,7 +1553,7 @@ function wachseBaum(pos, time) {
 			chunk[0] = 0
 		} else {
 			if (Math.random() < 0.95) {
-				return [pos,time+1,4]
+				return [pos, time + 1, 4]
 			} else {
 				chunk[1][chunkPos(pos)] = 1
 				updateScreen = true
@@ -1579,13 +1579,13 @@ function wachseGras(pos, time) {
 				}
 			}
 			if (nebenGras) {
-				return [pos,time+1,5]
+				return [pos, time + 1, 5]
 			} else {
-				return [pos, 0,5]
+				return [pos, 0, 5]
 			}
 		}
 	}
- return 0
+	return 0
 }
 function liegendesGras(pos, time) {
 	let chunk = chunks[chunkInd(pos)]
@@ -1596,7 +1596,7 @@ function liegendesGras(pos, time) {
 			updateScreen = true
 			chunk[0] = 0
 		} else {
-			return [pos,time+1,6]
+			return [pos, time + 1, 6]
 		}
 	}
 	return 0
@@ -1608,8 +1608,7 @@ function itemAction(pos, item) {
 	let actionedItems = [1, 6, 7]
 	if (actionedItems.includes(item)) {
 		let result = actions[actionedItems.indexOf(item)](pos, 0)
-		console.log(result)
-		if(result!=0){
+		if (result != 0) {
 			waitingStuff.push(result)
 		}
 	}
@@ -1621,9 +1620,10 @@ function groundAction(pos, ground) {
 	let actionedGrounds = [9, 12]
 	if (actionedGrounds.includes(ground)) {
 		let result = actions[actionedGrounds.indexOf(ground)](pos, 0)
-		if(result!=0){
+		if (result != 0) {
 			waitingStuff.push(result)
-		}}
+		}
+	}
 }
 function createChunks(generated, weltItems) {
 	const weltHöhen = generated[0]
@@ -1705,14 +1705,13 @@ setInterval(function () {
 	let neu = []
 	for (let x = 0; x < waitingStuff.length; x++) {
 		let funcVals = waitingStuff[x]
-		let neuWerte = timedFunctions[funcVals[2]](funcVals[0],funcVals[1])
-		if(neuWerte!=0){
+		let neuWerte = timedFunctions[funcVals[2]](funcVals[0], funcVals[1])
+		if (neuWerte != 0) {
 			neu.push(neuWerte)
 		}
 	}
 	waitingStuff = neu
-	console.log(waitingStuff)
-}, 1 * (1000))
+}, 15 * (1000))
 c.addEventListener('click', function (event) {
 	const width = c.width
 	const height = c.height
@@ -1778,6 +1777,7 @@ document.addEventListener("keydown", function (event) {
 		}
 	}
 })
+
 requestAnimationFrame(male)
 function triggerFileUpload() {
 	const fileInput = document.getElementById('fileUpload')
@@ -1786,7 +1786,7 @@ function triggerFileUpload() {
 }
 document.getElementById('fileUpload').addEventListener('change', function (event) {
 	const file = event.target.files[0]
-	/*if (file && file.type === 'application/json') {
+	if (file && file.type === 'application/json') {
 		const reader = new FileReader()
 		reader.onload = function (e) {
 			const jsonContent = e.target.result
@@ -1794,52 +1794,200 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 				let fehler = ""
 				let abbrechen = false
 				const parsedData = JSON.parse(jsonContent)
+				if (parsedData.length != 4) {
+					throw new Error("Daten komisch, falsche länge an Datensätzen!")
+				}
 				let neuChunks = parsedData[0]
-				if(neuChunks.length<chunks.length){
-					fehler+=`\nEs fehlen ${abs(chunks.length-neuChunks.length)} Chunks`
-					abbrechen = true
-				}else if(chunks.length<neuChunks.length){
-					fehler+=`\nEs gibt ${abs(chunks.length-neuChunks.length)} zu viel`
-				}
-				for(let x = 0;x<neuChunks.length;x++){
-					let chunk = neuChunks[x]
-					if(chunk.length!=){
-
+				if (neuChunks instanceof Array) {
+					let chunksDif = abs(chunks.length - neuChunks.length)
+					if (neuChunks.length < chunks.length) {
+						fehler += `\nEs fehlen ${chunksDif} Chunks`
+						abbrechen = true
+					} else if (chunks.length < neuChunks.length) {
+						fehler += `\nEs gibt ${chunksDif} zu viel`
+						neuChunks.splice(-chunksDif)
 					}
+					for (let x = 0; x < neuChunks.length; x++) {
+						let chunk = neuChunks[x]
+						if (!(chunk instanceof Array) || chunk.length != 5) {
+							fehler += `\nChunk ${x} hat eine Falsche menge an Datensätzen (${chunk.length} statt 5)`
+							abbrechen = true
+							continue
+						}
+						if (chunk[0] != 0) {
+							fehler += `\nChunk ${x} hat Daten an einer Stelle an der kein Bild gespeichert ist.`
+							chunk[0] = 0
+						}
+						if (chunk[1] instanceof Array) {
+							if (chunk[1].length != chunkKante ** 2) {
+								fehler += `\nChunk ${x} hat eine Falsche menge an Bodentypen (${chunk[1].length} statt ${chunkKante ** 2})`
+								abbrechen = true
+							}
+							for (let y = 0; y < Math.min(chunk[1].length, chunkKante ** 2); y++) {
+								if (Number.isFinite(chunk[1][y])) {
+									if (~~chunk[1][y] != chunk[1][y] || chunk[1][y] >= color.length || chunk[1][y] < 0) {
+										fehler += `\nChunk ${x} hat einen unbekannten Bodentyp an Stelle ${y}: ${chunk[1][y]}`
+										abbrechen = true
+									}
+								} else {
+									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Bodenwert an Stelle ${y}`
+									abbrechen = true
+								}
+							}
+						} else {
+							fehler += `\nChunk ${x} hat keinen interpretierbaren Boden`
+							abbrechen = true
+						}
+						if (chunk[2] instanceof Array) {
+							if (chunk[2].length != chunkKante ** 2) {
+								fehler += `\nChunk ${x} hat eine Falsche menge an Items (${chunk[2].length} statt ${chunkKante ** 2})`
+								abbrechen = true
+							}
+							for (let y = 0; y < Math.min(chunk[2].length, chunkKante ** 2); y++) {
+								if (Number.isFinite(chunk[2][y])) {
+									if (~~chunk[2][y] != chunk[2][y] || chunk[2][y] > textures.length || chunk[2][y] < 0) {
+										fehler += `\nChunk ${x} hat einen unbekanntes Item an Stelle ${y}: ${chunk[2][y]}`
+										chunk[2][y] = 0
+									}
+								} else {
+									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Itemwert an Stelle ${y}`
+									chunk[2][y] = 0
+								}
+							}
+						} else {
+							fehler += `\nChunk ${x} hat keine interpretierbaren Itemwerte`
+							abbrechen = true
+						}
+						if (chunk[3] instanceof Array) {
+							if (chunk[3].length != chunkKante ** 2) {
+								fehler += `\nChunk ${x} hat eine Falsche menge an Höhen (${chunk[3].length} statt ${chunkKante ** 2})`
+								abbrechen = true
+							}
+							for (let y = 0; y < Math.min(chunk[3].length, chunkKante ** 2); y++) {
+								if (Number.isFinite(chunk[3][y])) {
+									if (chunk[3][y] > 100 || chunk[3][y] < 0) {
+										fehler += `\nChunk ${x} hat eine zu extreme Höhe an Stelle ${y}: ${chunk[3][y]}`
+										abbrechen = true
+									}
+								} else {
+									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Höhenwert an Stelle ${y}`
+									abbrechen = true
+								}
+							}
+						} else {
+							fehler += `\nChunk ${x} hat keine interpretierbaren Höhenwerte`
+							abbrechen = true
+						}
+						if (chunk[4] instanceof Array) {
+							if (chunk[4].length != chunkKante ** 2) {
+								fehler += `\nChunk ${x} hat eine Falsche menge an Landmarkern (${chunk[4].length} statt ${chunkKante ** 2})`
+								abbrechen = true
+							}
+							for (let y = 0; y < Math.min(chunk[4].length, chunkKante ** 2); y++) {
+								if (Number.isFinite(chunk[4][y])) {
+									if (!(chunk[4][y] == 1 || chunk[4][y] == 0)) {
+										fehler += `\nChunk ${x} hat keinen Boolean wert (0 oder 1) für den Landmarker an Stelle ${y}: ${chunk[4][y]}`
+										abbrechen = true
+									}
+								} else {
+									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Landwert an Stelle ${y}`
+									abbrechen = true
+								}
+							}
+						} else {
+							fehler += `\nChunk ${x} hat keine interpretierbaren Landmarkerwerte`
+							abbrechen = true
+						}
+					}
+				} else {
+					fehler += `\nChunks nicht interpretierbar`
+					abbrechen = true
 				}
-				if(fehler!=""){
+				let neuWaitingStuff = parsedData[1]
+				if (neuChunks instanceof Array) {
+					for (let x = 0; x < waitingStuff.length; x++) {
+						let warte = waitingStuff[x]
+						if (warte instanceof Array && warte.length == 3) {
+							if(!(Number.isFinite(warte[0])&&~~warte[0] == warte[0] && warte[0] < map.length && warte[0] >= 0)){
+					   fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Position`
+					   abbrechen = true
+							}
+							if(!(Number.isFinite(warte[1])&&warte[1] >= 0)){
+					   fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Zeit`
+					   warte[1] = 0
+							}
+							if(!(Number.isFinite(warte[2])&&~~warte[2] == warte[2] && warte[2] < timedFunctions.length && warte[2] >= 0)){
+					   fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Funktion`
+					   abbrechen = true
+							}
+						} else {
+					 fehler += `\nwartedaten an stelle ${x} nicht interpretierbar`
+					 abbrechen = true
+						}
+					}
+				} else {
+					fehler += `\nwartedaten nicht interpretierbar`
+					abbrechen = true
+				}
+				let neuCounters = parsedData[2]
+				if (neuCounters instanceof Array&&neuCounters.length==counters.length) {
+					for (let x = 0; x < neuCounters.length; x++) {
+						let counter = neuCounters[x]
+						if(!(Number.isFinite(counter)&&~~counter == counter&& counter >= 0)){
+					  fehler += `\nZähler an stelle ${x} hat einen nicht interpretierbaren wert`
+					  abbrechen = true
+						}
+					}
+				} else {
+					fehler += `\nZählerdaten nicht interpretierbar`
+					abbrechen = true
+				}
+				let neuPlayerpos = parsedData[3]
+			 if(!(Number.isFinite(neuPlayerpos)&&~~neuPlayerpos == neuPlayerpos&& neuPlayerpos >= 0&& neuPlayerpos < map.length)){
+					fehler += `\nSpielerposition hat einen nicht interpretierbaren wert`
+					abbrechen = true
+				}
+				if (abbrechen) {
 					throw new Error(fehler)
-				}else{
+				} else {
 					chunks = neuChunks
 					counters = neuCounters
 					waitingStuff = neuWaitingStuff
+					playerPos = neuPlayerpos
+					updateScreen = true
+					programmStart = Date.now()
+					interrupt()
+					if (fehler != "") {
+						alert("Daten werden akzeptiert, aber:")
+					}
 				}
 			} catch (error) {
-				alert('Da wurde Pfusch in der Json datei betrieben!' + error.message)
+				alert('Da wurde Pfusch in der Json datei betrieben!\n' + error.message)
 			}
 		}
 		reader.readAsText(file)
 	} else {
-		alert('Dieses Dateiformat wird nicht unterstützt.')
-	}*/
+		alert('Dieses Dateiformat wird nicht unterstützt. Bitte verwende .json Dateien')
+	}
 })
 function downloadFile() {
 	let downloadData = [[...chunks]]
-	for(let x = 0;x<chunks.length;x++){
+	for (let x = 0; x < chunks.length; x++) {
 		downloadData[0][x][0] = 0
 	}
-	downloadData.push(waitingStuff)
 	let jetzt = Date.now()
-	counters[0] += jetzt-programmStart
+	counters[0] += jetzt - programmStart
 	programmStart = jetzt
 	counters[1]++
+	downloadData.push(waitingStuff)
 	downloadData.push(counters)
+	downloadData.push(playerPos)
 	const jsonString = JSON.stringify(downloadData)
 	const blob = new Blob([jsonString], { type: 'application/json' })
 	const link = document.createElement('a')
-link.href = URL.createObjectURL(blob)
-link.download = `Speicherpunkt_${counters[1]}.json`
-link.click()
+	link.href = URL.createObjectURL(blob)
+	link.download = `Speicherpunkt_${counters[1]}.json`
+	link.click()
 }
 window.addEventListener('resize', function () {
 	c.width = chunkKante * (~~((window.innerWidth) / chunkKante))
