@@ -963,40 +963,6 @@ function findStart(inseln, map) {
 	let y = ~~(pos / bewegt[2]) + bewegt[1]
 	return cord(x, y, map.length ** 0.5)
 }
-/*function areaData(pos, islandRef, islands, map, NN) {
-	const pow = islandRef.length
-	const kante = pow ** 0.5
-	let neuKante = 27
-	let neuPow = neuKante ** 2
-	let farbe = Array(neuPow).fill(0)
-	let height = Array(neuPow).fill(0)
-	let areaItems = Array(neuPow).fill(0)
-	let newTagged = Array(neuPow).fill(0)
-	const aX = pos % kante
-	const aY = ~~(pos / kante)
-	let extra = ~~(neuKante / 2)
-	let upper = Math.ceil(neuKante / 2)
-	for (let x = -extra; x < upper; x++) {
-		for (let y = -extra; y < upper; y++) {
-			let areaPos = cord(x + aX, y + aY, kante)
-			let newPos = cord(x + extra, y + extra, neuKante)
-			height[newPos] = map[areaPos]
-			areaItems[newPos] = allItems[areaPos]
-			newTagged[newPos] = ~~(islandRef[areaPos] > 0)
-			if (newTagged[newPos]) {
-				let insel = islands[islandRef[areaPos] - 1]
-				let xNull = insel[5][0]
-				let yNull = insel[5][1]
-				let inselKante = insel[5][2]
-				let areaX = areaPos % kante
-				let areaY = ~~(areaPos / kante)
-				let relPos = cord(areaX - xNull, areaY - yNull, inselKante)
-				farbe[newPos] = insel[7][relPos]
-			}
-		}
-	}
-	return [height, newTagged, NN, farbe, areaItems]
-}*/
 function generate(wasserPerc, auflösung) {
 	let map = resize(zoom(zoom([90], auflösung, 100), 1, 25))
 	const NN = waterPerc(map, wasserPerc)
@@ -1147,9 +1113,35 @@ function findWay(startPos, zielPos) {
 		}
 		changed = neu
 	}
+	let tested = Array(weltGröße).fill(0)
 	let länge = dis[zielPos]
 	if (länge == -1) {
-		return []
+		let nächstesPos = []
+		let changed = [zielPos]
+		while (changed.length > 0&&nächstesPos.length==0) {
+			let neu = []
+			for (let x = 0; x < changed.length; x++) {
+				for (let y = 0; y < 4; y++) {
+					let pos = posRich(changed[x], y, weltKante)
+					if (!tested[pos]) {
+						tested[pos] = 1
+						if(dis[pos]!=-1){
+							nächstesPos.push(pos)
+						}
+					}
+					neu.push(pos)
+				}
+			}
+			changed = neu
+		}
+		let bestPos = nächstesPos[0]
+		for(let x = 1;x<nächstesPos.length;x++){
+			if(dis[bestPos]>dis[nächstesPos[x]]){
+				bestPos = nächstesPos[x]
+			}
+		}
+		zielPos = bestPos
+		länge = dis[zielPos]
 	}
 	let weg = Array(länge)
 	while (länge--) {
@@ -1164,7 +1156,8 @@ function findWay(startPos, zielPos) {
 	}
 	return weg
 }
-function walk(weg) {
+function walk(weg, pickup) {
+	let endAction = (pickup || 0) - 1
 	if (weg.length == 0) {
 		return
 	}
@@ -1184,6 +1177,10 @@ function walk(weg) {
 			xPlayerOff = 0
 			yPlayerOff = 0
 			updateScreen = true
+			if (endAction != -1) {
+				walkable = false
+				changeBlock(endAction)
+			}
 			clearInterval(walkId)
 		} else {
 			playerPos = positions[x]
@@ -1191,7 +1188,7 @@ function walk(weg) {
 			yPlayerOff = env[weg[x] ^ 2][1] * (deltaTime % walkSpeed) / walkSpeed
 			updateScreen = true
 		}
-	})
+	}, 5)
 }
 function interrupt(resolve, stopper) {
 	clearInterval(walkId)
@@ -1222,7 +1219,7 @@ function interrupt(resolve, stopper) {
 				yPlayerOff = (endY * deltaTime) / walkSpeed
 				updateScreen = true
 			}
-		})
+		}, 5)
 	} else {
 		resolve()
 		clearTimeout(stopper)
@@ -1258,11 +1255,12 @@ function changeBlock(dir) {
 			}
 		}
 		chunk[2][chunkPos(pos)] = bodenItem
-		chunk[0] = createFrame(chunk[3], chunk[4], chunk[1], chunk[2])
+		chunk[0] = 0
 		itemAction(pos, bodenItem)
 		return
 	}
 	if (oldData != neuData) {
+		lastAction = oldData
 		let neuList = neuData.split("g")
 		let neuGelände = parseInt(neuList[1])
 		chunk[1][chunkPos(pos)] = neuGelände
@@ -1276,7 +1274,7 @@ function changeBlock(dir) {
 			chunk[2][chunkPos(pos)] = neuItem
 			itemAction(pos, neuItem)
 		}
-		chunk[0] = createFrame(chunk[3], chunk[4], chunk[1], chunk[2])
+		chunk[0] = 0
 	}
 }
 function beere(a) {
@@ -1643,6 +1641,16 @@ function liegendesGras(pos, time) {
 	}
 	return 0
 }
+function speicherErinnerung(pos, time) {
+	if (counters[1] == 0) {
+		if (time >= 40) {
+			alert("Denke mal dran das spiel zu speichern.\nTipp:\ndie dafür benötigten knöpfe könen durch runterscrollen gefunden werden.")
+		} else {
+			return [pos, time + 1, 7]
+		}
+	}
+	return 0
+}
 function itemAction(pos, item) {
 	let actions = [
 		liegendeBeere, liegendeNuss, liegendesGras
@@ -1709,7 +1717,7 @@ function createChunks(generated, weltItems) {
 	}
 	return chunkData
 }
-let map, tagged, inseln, NN, weltGröße, weltKante, playerPos, xPlayerOff, yPlayerOff, holding, walkable, allItems, textures, chunks, counters, waitingStuff
+let map, tagged, inseln, NN, weltGröße, weltKante, playerPos, xPlayerOff, yPlayerOff, holding, walkable, allItems, textures, chunks, counters, waitingStuff, lastAction
 function main() {
 	const generated = generate(90, 2)
 	console.log(c.width, c.height)
@@ -1724,15 +1732,16 @@ function main() {
 	xPlayerOff = 0
 	yPlayerOff = 0
 	holding = 0
+	lastAction = ""
 	walkable = true
 	allItems = Array(map.length).fill(0)
 	textures = texture(scale)
 	//Lege Items und gelände hin
-	let localPos = playerPos
+/*	let localPos = playerPos
 	for (let x = 1; x < textures.length + 1; x++) {
 		localPos = posRich(localPos, 1, kant(map))
 		allItems[localPos] = x
-	}
+	}*/
 	//ENDE
 	chunks = createChunks(generated, allItems)
 	stop("chunks")
@@ -1742,9 +1751,9 @@ function main() {
 	timedFunctions = [
 		liegendeBeere, wachseBusch, wachseBeeren,
 		liegendeNuss, wachseBaum, wachseGras,
-		liegendesGras
+		liegendesGras, speicherErinnerung
 	]
-	waitingStuff = []
+	waitingStuff = [[0, 0, 7]]
 	setInterval(function () {
 		let neu = []
 		for (let x = 0; x < waitingStuff.length; x++) {
@@ -1792,15 +1801,68 @@ c.addEventListener('click', async function (event) {
 		} catch (error) {
 			console.log(error)
 		}
+		let a = holding
+		let b = chunks[chunkInd(pos)][1][chunkPos(pos)]
+		let anweisung = `${a}g${b}`
 		if (x == halfChunk && y == halfChunk) {
 			walkable = !walkable
 			updateScreen = true
 		} else if (abs(xDif) + abs(yDif) < 2 && !walkable) {
 			changeBlock((xDif & 2) + yDif + 1)
-		} else {
-			walkable = true
+		} else if (!walkable && lastAction == anweisung && chunks[chunkInd(pos)][2][chunkPos(pos)] == 0) {
 			let way = findWay(playerPos, pos)
-			walk(way)
+			let imaginPos = playerPos
+			for (let i = 0; i < way.length; i++) {
+				imaginPos = posRich(imaginPos, way[i], weltKante)
+			}
+			if(imaginPos==pos){
+				let lastInd = way.length-1
+				if(way[lastInd]<4){
+					imaginPos = posRich(imaginPos,way.pop()^2,weltKante)
+				}else{
+					let direction = way.pop()
+					let firstOption = direction-4
+					let secondOption = (firstOption+1)%4
+					imaginPos = posRich(imaginPos,firstOption^2,weltKante)
+					way.push(secondOption)
+				}
+			}
+			let xImaginPos = imaginPos % weltKante
+			let yImaginPos = ~~(imaginPos / weltKante)
+			let xPos = pos % weltKante
+			let yPos = ~~(pos / weltKante)
+			let xPlayer = playerPos % weltKante
+			let yPlayer = ~~(playerPos / weltKante)
+			if (abs(xImaginPos - xPos) + abs(yImaginPos - yPos) == 1) {
+				walkable = true
+				walk(way, ((xPos - xImaginPos) & 2) + (yPos - yImaginPos) + 2)
+			} else if (abs(xPlayer - xPos) + abs(yPlayer - yPos) > 2) {
+				walkable = true
+				walk(way)
+			}
+		} else {
+			let extraAction = 0
+			let way = findWay(playerPos, pos)
+			if(!walkable){
+				let imaginPos = playerPos
+			 for (let i = 0; i < way.length; i++) {
+				 imaginPos = posRich(imaginPos, way[i], weltKante)
+			 }
+				if((holding!=0||chunks[chunkInd(imaginPos)][2][chunkPos(imaginPos)]!=0)&&imaginPos==pos){
+					let lastInd = way.length-1
+				if(way[lastInd]<4){
+					extraAction = way.pop()+1
+				}else{
+					let direction = way.pop()
+					let firstOption = direction-4
+					let secondOption = (firstOption+1)%4
+					extraAction = firstOption+1
+					way.push(secondOption)
+				}
+				}
+			}
+			walkable = true
+			walk(way,extraAction)
 		}
 	}
 })
