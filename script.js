@@ -1,5 +1,9 @@
 const c = document.getElementById("myCanvas")
 const ctx = c.getContext("2d")
+const popupContent = document.getElementById('popup-content')
+popup.style.maxWidth = `${window.innerWidth * 0.9}px`
+popup.style.maxHeight = `${window.innerHeight * 0.3}px`
+popupContent.style.fontSize = `${Math.max(Math.min(window.innerWidth, window.innerHeight) * 0.025, 15)}px`
 let programmStart = Date.now()
 const chunkKante = 25
 const walkSpeed = 150
@@ -1118,14 +1122,14 @@ function findWay(startPos, zielPos) {
 	if (länge == -1) {
 		let nächstesPos = []
 		let changed = [zielPos]
-		while (changed.length > 0&&nächstesPos.length==0) {
+		while (changed.length > 0 && nächstesPos.length == 0) {
 			let neu = []
 			for (let x = 0; x < changed.length; x++) {
 				for (let y = 0; y < 4; y++) {
 					let pos = posRich(changed[x], y, weltKante)
 					if (!tested[pos]) {
 						tested[pos] = 1
-						if(dis[pos]!=-1){
+						if (dis[pos] != -1) {
 							nächstesPos.push(pos)
 						}
 					}
@@ -1135,8 +1139,8 @@ function findWay(startPos, zielPos) {
 			changed = neu
 		}
 		let bestPos = nächstesPos[0]
-		for(let x = 1;x<nächstesPos.length;x++){
-			if(dis[bestPos]>dis[nächstesPos[x]]){
+		for (let x = 1; x < nächstesPos.length; x++) {
+			if (dis[bestPos] > dis[nächstesPos[x]]) {
 				bestPos = nächstesPos[x]
 			}
 		}
@@ -1157,7 +1161,9 @@ function findWay(startPos, zielPos) {
 	return weg
 }
 function walk(weg, pickup) {
-	let endAction = (pickup || 0) - 1
+	let beforeWalking = walkable
+	walkable = true
+	let endAction = pickup || 0
 	if (weg.length == 0) {
 		return
 	}
@@ -1173,13 +1179,13 @@ function walk(weg, pickup) {
 		let deltaTime = Date.now() - walkStart
 		let x = ~~(deltaTime / walkSpeed)
 		if (x >= weg.length) {
+			walkable = beforeWalking
 			playerPos = zielPos
 			xPlayerOff = 0
 			yPlayerOff = 0
 			updateScreen = true
-			if (endAction != -1) {
-				walkable = false
-				changeBlock(endAction)
+			if (endAction != 0) {
+				endAction()
 			}
 			clearInterval(walkId)
 		} else {
@@ -1644,7 +1650,7 @@ function liegendesGras(pos, time) {
 function speicherErinnerung(pos, time) {
 	if (counters[1] == 0) {
 		if (time >= 40) {
-			alert("Denke mal dran das spiel zu speichern.\nTipp:\ndie dafür benötigten knöpfe könen durch runterscrollen gefunden werden.")
+			showPopup("Denke mal dran das spiel zu speichern.\nTipp:\ndie dafür benötigten knöpfe könen durch runterscrollen gefunden werden.", 10)
 		} else {
 			return [pos, time + 1, 7]
 		}
@@ -1737,17 +1743,17 @@ function main() {
 	allItems = Array(map.length).fill(0)
 	textures = texture(scale)
 	//Lege Items und gelände hin
-/*	let localPos = playerPos
-	for (let x = 1; x < textures.length + 1; x++) {
-		localPos = posRich(localPos, 1, kant(map))
-		allItems[localPos] = x
-	}*/
+	/*	let localPos = playerPos
+		for (let x = 1; x < textures.length + 1; x++) {
+			localPos = posRich(localPos, 1, kant(map))
+			allItems[localPos] = x
+		}*/
 	//ENDE
 	chunks = createChunks(generated, allItems)
 	stop("chunks")
 	//0 = time in ms
 	//1 = downloads
-	counters = Array(2).fill(0)
+	counters = Array(3).fill(0)
 	timedFunctions = [
 		liegendeBeere, wachseBusch, wachseBeeren,
 		liegendeNuss, wachseBaum, wachseGras,
@@ -1815,15 +1821,15 @@ c.addEventListener('click', async function (event) {
 			for (let i = 0; i < way.length; i++) {
 				imaginPos = posRich(imaginPos, way[i], weltKante)
 			}
-			if(imaginPos==pos){
-				let lastInd = way.length-1
-				if(way[lastInd]<4){
-					imaginPos = posRich(imaginPos,way.pop()^2,weltKante)
-				}else{
+			if (imaginPos == pos) {
+				let lastInd = way.length - 1
+				if (way[lastInd] < 4) {
+					imaginPos = posRich(imaginPos, way.pop() ^ 2, weltKante)
+				} else {
 					let direction = way.pop()
-					let firstOption = direction-4
-					let secondOption = (firstOption+1)%4
-					imaginPos = posRich(imaginPos,firstOption^2,weltKante)
+					let firstOption = direction - 4
+					let secondOption = (firstOption + 1) % 4
+					imaginPos = posRich(imaginPos, firstOption ^ 2, weltKante)
 					way.push(secondOption)
 				}
 			}
@@ -1834,35 +1840,34 @@ c.addEventListener('click', async function (event) {
 			let xPlayer = playerPos % weltKante
 			let yPlayer = ~~(playerPos / weltKante)
 			if (abs(xImaginPos - xPos) + abs(yImaginPos - yPos) == 1) {
-				walkable = true
-				walk(way, ((xPos - xImaginPos) & 2) + (yPos - yImaginPos) + 2)
+				walk(way, () => changeBlock(((xPos - xImaginPos) & 2) + (yPos - yImaginPos) + 1))
 			} else if (abs(xPlayer - xPos) + abs(yPlayer - yPos) > 2) {
-				walkable = true
 				walk(way)
 			}
 		} else {
 			let extraAction = 0
 			let way = findWay(playerPos, pos)
-			if(!walkable){
+			if (!walkable) {
 				let imaginPos = playerPos
-			 for (let i = 0; i < way.length; i++) {
-				 imaginPos = posRich(imaginPos, way[i], weltKante)
-			 }
-				if((holding!=0||chunks[chunkInd(imaginPos)][2][chunkPos(imaginPos)]!=0)&&imaginPos==pos){
-					let lastInd = way.length-1
-				if(way[lastInd]<4){
-					extraAction = way.pop()+1
-				}else{
-					let direction = way.pop()
-					let firstOption = direction-4
-					let secondOption = (firstOption+1)%4
-					extraAction = firstOption+1
-					way.push(secondOption)
+				for (let i = 0; i < way.length; i++) {
+					imaginPos = posRich(imaginPos, way[i], weltKante)
 				}
+				if (chunks[chunkInd(imaginPos)][2][chunkPos(imaginPos)] != 0 && imaginPos == pos) {
+					let lastInd = way.length - 1
+					if (way[lastInd] < 4) {
+						extraAction = way.pop()
+					} else {
+						let direction = way.pop()
+						let firstOption = direction - 4
+						let secondOption = (firstOption + 1) % 4
+						extraAction = firstOption
+						way.push(secondOption)
+					}
+					walk(way, () => changeBlock(extraAction))
+					return
 				}
 			}
-			walkable = true
-			walk(way,extraAction)
+			walk(way)
 		}
 	}
 })
@@ -2072,17 +2077,25 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					abbrechen = true
 				}
 				let neuCounters = parsedData[2]
-				if (neuCounters instanceof Array && neuCounters.length == counters.length) {
-					for (let x = 0; x < neuCounters.length; x++) {
-						let counter = neuCounters[x]
-						if (!(Number.isFinite(counter) && ~~counter == counter && counter >= 0)) {
-							fehler += `\nZähler an stelle ${x} hat einen nicht interpretierbaren wert`
-							abbrechen = true
+				if (neuCounters instanceof Array) {
+					if (neuCounters.length == counters.length) {
+						for (let x = 0; x < neuCounters.length; x++) {
+							let counter = neuCounters[x]
+							if (!(Number.isFinite(counter) && ~~counter == counter && counter >= 0)) {
+								fehler += `\nZähler an stelle ${x} hat einen nicht interpretierbaren wert`
+								neuCounters[x] = 0
+							}
 						}
+					} else if(neuCounters.length < counters.length){
+						fehler += `\nFehlende Zählerwerte`
+						neuCounters.push(...Array(counters.length-neuCounters.length).fill(0))
+					}else{
+						fehler += `\nzu viele Zählerwerte`
+						neuCounters.splice(counters.length-neuCounters.length)
 					}
 				} else {
 					fehler += `\nZählerdaten nicht interpretierbar`
-					abbrechen = true
+					neuCounters = Array(counters.length).fill(0)
 				}
 				let neuPlayerpos = parsedData[3]
 				if (!(Number.isFinite(neuPlayerpos) && ~~neuPlayerpos == neuPlayerpos && neuPlayerpos >= 0 && neuPlayerpos < map.length)) {
@@ -2103,16 +2116,16 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					xPlayerOff = 0
 					yPlayerOff = 0
 					if (fehler != "") {
-						alert("Daten werden akzeptiert, aber:")
+						showPopup("Daten werden akzeptiert, aber:" + fehler, 10)
 					}
 				}
 			} catch (error) {
-				alert('Da wurde Pfusch in der Json datei betrieben!\n' + error.message)
+				showPopup('Da wurde Pfusch in der Json datei betrieben!\n' + error.message, 20)
 			}
 		}
 		reader.readAsText(file)
 	} else {
-		alert('Dieses Dateiformat wird nicht unterstützt. Bitte verwende .json Dateien')
+		showPopup('Dieses Dateiformat wird nicht unterstützt. Bitte verwende .json Dateien', 10)
 	}
 })
 function downloadFile() {
@@ -2144,6 +2157,9 @@ window.addEventListener('resize', function () {
 		chunks[x][0] = 0
 	}
 	updateScreen = true
+	popup.style.maxWidth = `${window.innerWidth * 0.9}px`
+	popup.style.maxHeight = `${window.innerHeight * 0.3}px`
+	popupContent.style.fontSize = `${Math.max(Math.min(window.innerWidth, window.innerHeight) * 0.025, 15)}px`
 })
 window.onload = async function () {
 	const bildUrl = "https://wallpapercave.com/wp/V2ZOA5f.png"
@@ -2187,4 +2203,19 @@ window.onload = async function () {
 		console.log(error)
 		main()
 	}
+}
+let stopPopup
+function showPopup(textInput, time) {
+	clearTimeout(stopPopup)
+	const popup = document.getElementById('popup')
+	popupContent.textContent = textInput
+	popup.style.display = 'block'
+	popup.style.visibility = 'visible'
+	setTimeout(() => {
+		popup.style.opacity = 1
+}, 100)
+	stopPopup = setTimeout(() => {
+		popup.style.visibility = 'hidden'
+		popup.style.opacity = 0
+	}, time * 1000)
 }
