@@ -1,13 +1,15 @@
-let programmStart = Date.now()
 const c = document.getElementById("myCanvas")
 const ctx = c.getContext("2d")
+let programmStart = Date.now()
 const chunkKante = 25
+const walkSpeed = 150
+let tastenEingabe = false
 c.width = chunkKante * (~~((window.innerWidth) / chunkKante))
 c.height = chunkKante * (~~((window.innerHeight) / chunkKante))
 let scale = Math.max(c.width, c.height) / chunkKante
 let updateScreen = true
-const env = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [1, -1], [-1, -1], [-1, 1]]
-let walkId
+const env = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]]
+let walkId, interruptId
 function einfarbigB(a, farbe) {
 	const pow = a ** 2
 	let out = Array(pow)
@@ -922,7 +924,7 @@ function tagTerrain(into, NN) {
 		let rand = Math.random()
 		if (rand < 1 / 64) {
 			terrain[erde[x]] = 7
-		} else if (rand < 1 / 64 + (1 / 200) * ((karte[erde[x]] - NN - 2) ** 2) && karte[erde[x]] > NN + 4) {
+		} else if (rand < Math.min(1 / 64 + (1 / 200) * ((karte[erde[x]] - NN - 2) ** 2), 0.5) && karte[erde[x]] > NN + 4) {
 			terrain[erde[x]] = 8
 		}
 	}
@@ -961,7 +963,7 @@ function findStart(inseln, map) {
 	let y = ~~(pos / bewegt[2]) + bewegt[1]
 	return cord(x, y, map.length ** 0.5)
 }
-function areaData(pos, islandRef, islands, map, NN) {
+/*function areaData(pos, islandRef, islands, map, NN) {
 	const pow = islandRef.length
 	const kante = pow ** 0.5
 	let neuKante = 27
@@ -994,7 +996,7 @@ function areaData(pos, islandRef, islands, map, NN) {
 		}
 	}
 	return [height, newTagged, NN, farbe, areaItems]
-}
+}*/
 function generate(wasserPerc, auflösung) {
 	let map = resize(zoom(zoom([90], auflösung, 100), 1, 25))
 	const NN = waterPerc(map, wasserPerc)
@@ -1122,13 +1124,22 @@ function findWay(startPos, zielPos) {
 	let changed = [startPos]
 	dis[startPos] = 0
 	let time = 0
-	while (changed.length > 0) {
+	while (changed.length > 0 && dis[zielPos] == -1) {
 		time++
 		let neu = []
 		for (let x = 0; x < changed.length; x++) {
 			for (let y = 0; y < 8; y++) {
 				let pos = posRich(changed[x], y, weltKante)
 				if (boden.includes(bodenTyp(pos)) && dis[pos] == -1) {
+					if (y > 3) {
+						let firstRich = y - 4
+						let secondRich = (firstRich + 1) % 4
+						let firstPos = posRich(changed[x], firstRich, weltKante)
+						let secondPos = posRich(changed[x], secondRich, weltKante)
+						if (!(boden.includes(bodenTyp(firstPos)) && boden.includes(bodenTyp(secondPos)))) {
+							continue
+						}
+					}
 					neu.push(pos)
 					dis[pos] = time
 				}
@@ -1162,7 +1173,6 @@ function walk(weg) {
 	for (let x = 1; x < weg.length; x++) {
 		positions[x] = posRich(positions[x - 1], weg[x - 1], weltKante)
 	}
-	const walkSpeed = 150
 	let lastInd = weg.length - 1
 	let zielPos = posRich(positions[lastInd], weg[lastInd], weltKante)
 	let walkStart = Date.now()
@@ -1171,7 +1181,10 @@ function walk(weg) {
 		let x = ~~(deltaTime / walkSpeed)
 		if (x >= weg.length) {
 			playerPos = zielPos
-			interrupt()
+			xPlayerOff = 0
+			yPlayerOff = 0
+			updateScreen = true
+			clearInterval(walkId)
 		} else {
 			playerPos = positions[x]
 			xPlayerOff = env[weg[x] ^ 2][0] * (deltaTime % walkSpeed) / walkSpeed
@@ -1180,11 +1193,40 @@ function walk(weg) {
 		}
 	})
 }
-function interrupt() {
+function interrupt(resolve, stopper) {
 	clearInterval(walkId)
-	xPlayerOff = 0
-	yPlayerOff = 0
-	updateScreen = true
+	clearInterval(interruptId)
+	if (xPlayerOff != 0 || yPlayerOff != 0) {
+		let start = Date.now()
+		let startX = xPlayerOff
+		let startY = yPlayerOff
+		start -= Math.max(abs(startX), abs(startY)) * walkSpeed
+		let endX = Math.round(abs(startX) / startX) || 0
+		let endY = Math.round(abs(startY) / startY) || 0
+		let playerX = playerPos % weltKante
+		let playerY = ~~(playerPos / weltKante)
+		let neuPos = cord(playerX - endX, playerY - endY, weltKante)
+		updateScreen = true
+		interruptId = setInterval(function () {
+			let deltaTime = Date.now() - start
+			if (deltaTime >= walkSpeed) {
+				playerPos = neuPos
+				xPlayerOff = 0
+				yPlayerOff = 0
+				updateScreen = true
+				clearInterval(interruptId)
+				resolve()
+				clearTimeout(stopper)
+			} else {
+				xPlayerOff = (endX * deltaTime) / walkSpeed
+				yPlayerOff = (endY * deltaTime) / walkSpeed
+				updateScreen = true
+			}
+		})
+	} else {
+		resolve()
+		clearTimeout(stopper)
+	}
 }
 function changeBlock(dir) {
 	updateScreen = true
@@ -1667,52 +1709,56 @@ function createChunks(generated, weltItems) {
 	}
 	return chunkData
 }
-const generated = generate(90, 2)
-console.log(c.width, c.height)
-stop("generieren")
-const map = generated[0]
-const tagged = generated[1]
-const inseln = generated[2]
-const NN = generated[3]
-const weltGröße = map.length
-const weltKante = weltGröße ** 0.5
-let playerPos = findStart(inseln, map)
-let xPlayerOff = 0
-let yPlayerOff = 0
-let holding = 0
-let walkable = true
-let allItems = Array(map.length).fill(0)
-let textures = texture(scale)
-//Lege Items und gelände hin
-let localPos = playerPos
-for (let x = 1; x < textures.length + 1; x++) {
-	localPos = posRich(localPos, 1, kant(map))
-	allItems[localPos] = x
-}
-//ENDE
-let chunks = createChunks(generated, allItems)
-stop("chunks")
-//0 = time in ms
-//1 = downloads
-let counters = Array(2).fill(0)
-const timedFunctions = [
-	liegendeBeere, wachseBusch, wachseBeeren,
-	liegendeNuss, wachseBaum, wachseGras,
-	liegendesGras
-]
-let waitingStuff = []
-setInterval(function () {
-	let neu = []
-	for (let x = 0; x < waitingStuff.length; x++) {
-		let funcVals = waitingStuff[x]
-		let neuWerte = timedFunctions[funcVals[2]](funcVals[0], funcVals[1])
-		if (neuWerte != 0) {
-			neu.push(neuWerte)
-		}
+let map, tagged, inseln, NN, weltGröße, weltKante, playerPos, xPlayerOff, yPlayerOff, holding, walkable, allItems, textures, chunks, counters, waitingStuff
+function main() {
+	const generated = generate(90, 2)
+	console.log(c.width, c.height)
+	stop("generieren")
+	map = generated[0]
+	tagged = generated[1]
+	inseln = generated[2]
+	NN = generated[3]
+	weltGröße = map.length
+	weltKante = weltGröße ** 0.5
+	playerPos = findStart(inseln, map)
+	xPlayerOff = 0
+	yPlayerOff = 0
+	holding = 0
+	walkable = true
+	allItems = Array(map.length).fill(0)
+	textures = texture(scale)
+	//Lege Items und gelände hin
+	let localPos = playerPos
+	for (let x = 1; x < textures.length + 1; x++) {
+		localPos = posRich(localPos, 1, kant(map))
+		allItems[localPos] = x
 	}
-	waitingStuff = neu
-}, 15 * (1000))
-c.addEventListener('click', function (event) {
+	//ENDE
+	chunks = createChunks(generated, allItems)
+	stop("chunks")
+	//0 = time in ms
+	//1 = downloads
+	counters = Array(2).fill(0)
+	timedFunctions = [
+		liegendeBeere, wachseBusch, wachseBeeren,
+		liegendeNuss, wachseBaum, wachseGras,
+		liegendesGras
+	]
+	waitingStuff = []
+	setInterval(function () {
+		let neu = []
+		for (let x = 0; x < waitingStuff.length; x++) {
+			let funcVals = waitingStuff[x]
+			let neuWerte = timedFunctions[funcVals[2]](funcVals[0], funcVals[1])
+			if (neuWerte != 0) {
+				neu.push(neuWerte)
+			}
+		}
+		waitingStuff = neu
+	}, 15 * (1000))
+	requestAnimationFrame(male)
+}
+c.addEventListener('click', async function (event) {
 	const width = c.width
 	const height = c.height
 	const widthOff = (chunkKante - (width / scale)) * scale * 0.5
@@ -1722,8 +1768,8 @@ c.addEventListener('click', function (event) {
 	let scaleY = c.height / rect.height
 	let clickX = (event.clientX - rect.left) * scaleX + widthOff
 	let clickY = (event.clientY - rect.top) * scaleY + heightOff
-	let x = ~~(clickX / scale)
-	let y = ~~(clickY / scale)
+	let x = ~~((clickX + xPlayerOff) / scale)
+	let y = ~~((clickY + yPlayerOff) / scale)
 	if (0 <= x && x < chunkKante && 0 <= y && y < chunkKante) {
 		const halfChunk = chunkKante >> 1
 		const xOffset = (playerPos % weltKante) - halfChunk
@@ -1731,7 +1777,21 @@ c.addEventListener('click', function (event) {
 		let pos = cord(x + xOffset, y + yOffset, weltKante)
 		let xDif = x - halfChunk
 		let yDif = y - halfChunk
-		interrupt()
+		function abbruchAnimation() {
+			return new Promise((resolve) => {
+				let stopper = setTimeout(function () {
+					clearInterval(interruptId)
+					clearInterval(walkId)
+					resolve()
+				}, walkSpeed)
+				interrupt(resolve, stopper)
+			})
+		}
+		try {
+			await abbruchAnimation()
+		} catch (error) {
+			console.log(error)
+		}
 		if (x == halfChunk && y == halfChunk) {
 			walkable = !walkable
 			updateScreen = true
@@ -1744,41 +1804,61 @@ c.addEventListener('click', function (event) {
 		}
 	}
 })
-document.addEventListener("keydown", function (event) {
-	let destination = -1
-	switch (event.key) {
-		case "w":
-			destination = 0
-			break
-		case "a":
-			destination = 3
-			break
-		case "s":
-			destination = 2
-			break
-		case "d":
-			destination = 1
-			break
-		case "e":
-			interrupt()
-			walkable = !walkable
-			updateScreen = true
-			break
-	}
-	if (destination != -1) {
-		interrupt()
-		if (walkable) {
-			let neuPos = posRich(playerPos, destination, weltKante)
-			if (boden.includes(bodenTyp(neuPos))) {
-				walk([destination])
-			}
-		} else {
-			changeBlock(destination)
+document.addEventListener("keydown", async function (event) {
+	if (!tastenEingabe) {
+		tastenEingabe = true
+		function abbruchAnimation() {
+			return new Promise((resolve) => {
+				let stopper = setTimeout(function () {
+					clearInterval(interruptId)
+					clearInterval(walkId)
+					resolve()
+				}, walkSpeed)
+				interrupt(resolve, stopper)
+			})
 		}
+		let destination = -1
+		switch (event.key) {
+			case "w":
+				destination = 0
+				break
+			case "a":
+				destination = 3
+				break
+			case "s":
+				destination = 2
+				break
+			case "d":
+				destination = 1
+				break
+			case "e":
+				try {
+					await abbruchAnimation()
+				} catch (error) {
+					console.log(error)
+				}
+				walkable = !walkable
+				updateScreen = true
+				break
+		}
+		if (destination != -1) {
+			try {
+				await abbruchAnimation()
+			} catch (error) {
+				console.log(error)
+			}
+			if (walkable) {
+				let neuPos = posRich(playerPos, destination, weltKante)
+				if (boden.includes(bodenTyp(neuPos))) {
+					walk([destination])
+				}
+			} else {
+				changeBlock(destination)
+			}
+		}
+		tastenEingabe = false
 	}
 })
-
-requestAnimationFrame(male)
 function triggerFileUpload() {
 	const fileInput = document.getElementById('fileUpload')
 	fileInput.value = null
@@ -1867,7 +1947,7 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 								if (Number.isFinite(chunk[3][y])) {
 									if (chunk[3][y] > 100 || chunk[3][y] < 0) {
 										fehler += `\nChunk ${x} hat eine zu extreme Höhe an Stelle ${y}: ${chunk[3][y]}`
-										abbrechen = true
+										chunk[3][y] = Math.max(Math.min(chunk[3][y], 100), 0)
 									}
 								} else {
 									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Höhenwert an Stelle ${y}`
@@ -1908,21 +1988,21 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					for (let x = 0; x < waitingStuff.length; x++) {
 						let warte = waitingStuff[x]
 						if (warte instanceof Array && warte.length == 3) {
-							if(!(Number.isFinite(warte[0])&&~~warte[0] == warte[0] && warte[0] < map.length && warte[0] >= 0)){
-					   fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Position`
-					   abbrechen = true
+							if (!(Number.isFinite(warte[0]) && ~~warte[0] == warte[0] && warte[0] < map.length && warte[0] >= 0)) {
+								fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Position`
+								abbrechen = true
 							}
-							if(!(Number.isFinite(warte[1])&&warte[1] >= 0)){
-					   fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Zeit`
-					   warte[1] = 0
+							if (!(Number.isFinite(warte[1]) && warte[1] >= 0)) {
+								fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Zeit`
+								warte[1] = 0
 							}
-							if(!(Number.isFinite(warte[2])&&~~warte[2] == warte[2] && warte[2] < timedFunctions.length && warte[2] >= 0)){
-					   fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Funktion`
-					   abbrechen = true
+							if (!(Number.isFinite(warte[2]) && ~~warte[2] == warte[2] && warte[2] < timedFunctions.length && warte[2] >= 0)) {
+								fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Funktion`
+								abbrechen = true
 							}
 						} else {
-					 fehler += `\nwartedaten an stelle ${x} nicht interpretierbar`
-					 abbrechen = true
+							fehler += `\nwartedaten an stelle ${x} nicht interpretierbar`
+							abbrechen = true
 						}
 					}
 				} else {
@@ -1930,12 +2010,12 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					abbrechen = true
 				}
 				let neuCounters = parsedData[2]
-				if (neuCounters instanceof Array&&neuCounters.length==counters.length) {
+				if (neuCounters instanceof Array && neuCounters.length == counters.length) {
 					for (let x = 0; x < neuCounters.length; x++) {
 						let counter = neuCounters[x]
-						if(!(Number.isFinite(counter)&&~~counter == counter&& counter >= 0)){
-					  fehler += `\nZähler an stelle ${x} hat einen nicht interpretierbaren wert`
-					  abbrechen = true
+						if (!(Number.isFinite(counter) && ~~counter == counter && counter >= 0)) {
+							fehler += `\nZähler an stelle ${x} hat einen nicht interpretierbaren wert`
+							abbrechen = true
 						}
 					}
 				} else {
@@ -1943,7 +2023,7 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					abbrechen = true
 				}
 				let neuPlayerpos = parsedData[3]
-			 if(!(Number.isFinite(neuPlayerpos)&&~~neuPlayerpos == neuPlayerpos&& neuPlayerpos >= 0&& neuPlayerpos < map.length)){
+				if (!(Number.isFinite(neuPlayerpos) && ~~neuPlayerpos == neuPlayerpos && neuPlayerpos >= 0 && neuPlayerpos < map.length)) {
 					fehler += `\nSpielerposition hat einen nicht interpretierbaren wert`
 					abbrechen = true
 				}
@@ -1956,7 +2036,10 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					playerPos = neuPlayerpos
 					updateScreen = true
 					programmStart = Date.now()
-					interrupt()
+					clearInterval(walkId)
+					clearInterval(interruptId)
+					xPlayerOff = 0
+					yPlayerOff = 0
 					if (fehler != "") {
 						alert("Daten werden akzeptiert, aber:")
 					}
@@ -2000,3 +2083,46 @@ window.addEventListener('resize', function () {
 	}
 	updateScreen = true
 })
+window.onload = async function () {
+	const bildUrl = "https://wallpapercave.com/wp/V2ZOA5f.png"
+	const bild = new Image()
+	function ladeBildAsync(url) {
+		return new Promise((resolve, reject) => {
+			bild.src = url;
+			const timer = setTimeout(() => { reject("timeout") }, 1000)
+			bild.onload = () => {
+				clearTimeout(timer)
+				resolve(bild)
+			}
+			bild.onerror = () => {
+				clearTimeout(timer)
+				reject("error")
+			}
+		})
+	}
+	try {
+		await ladeBildAsync(bildUrl)
+		const imgAspectRatio = bild.width / bild.height
+		const canvasAspectRatio = c.width / c.height
+		let newWidth, newHeight;
+		if (c.width < bild.width || c.height < bild.height) {
+			if (canvasAspectRatio > imgAspectRatio) {
+				newHeight = c.height;
+				newWidth = c.height * imgAspectRatio
+			} else {
+				newWidth = c.width;
+				newHeight = c.width / imgAspectRatio
+			}
+		} else {
+			newWidth = bild.width
+			newHeight = bild.height
+		}
+		const offsetX = (c.width - newWidth) / 2
+		const offsetY = (c.height - newHeight) / 2
+		ctx.drawImage(bild, offsetX, offsetY, newWidth, newHeight)
+		setTimeout(main, 100)
+	} catch (error) {
+		console.log(error)
+		main()
+	}
+}

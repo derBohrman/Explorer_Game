@@ -1,26 +1,31 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-<meta charset = "UTF-8">
-<title>explore</title>
-<link rel="icon" type="image/png" href="https://www.drodd.com/images15/letter-n19.png">
-<style>
- body, html {
-     margin: 0;
-     height: 100%;
- }
- canvas {
-     display: block;
-     width: 100vw;
-     height: 100vh;
- }
-</style>
+ <meta charset="UTF-8">
+ <title>explore</title>
+ <link rel="icon" type="image/png" href="https://www.drodd.com/images15/letter-n19.png">
+ <style>
+  body,
+  html {
+   margin: 0;
+   height: 100%;
+  }
+
+  canvas {
+   display: block;
+   width: 100vw;
+   height: 100vh;
+  }
+ </style>
 </head>
+
 <body>
-<canvas id="myCanvas"></canvas>
-<input type="file" id="fileUpload" style="display: none;" accept=".json,application/json"/>
-<button onclick="triggerFileUpload()">Hochladen</button>
-<button onclick="downloadFile()">Herunterladen</button>
-<script src="script.js"></script>
+ <canvas id="myCanvas"></canvas>
+ <input type="file" id="fileUpload" style="display: none;" accept=".json,application/json" />
+ <button onclick="triggerFileUpload()">Hochladen</button>
+ <button onclick="downloadFile()">Herunterladen</button>
+ <script src="script.js"></script>
 </body>
+
 </html>
