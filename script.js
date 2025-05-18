@@ -6,7 +6,8 @@ popup.style.maxHeight = `${window.innerHeight * 0.3}px`
 popupContent.style.fontSize = `${Math.max(Math.min(window.innerWidth, window.innerHeight) * 0.025, 15)}px`
 let programmStart = Date.now()
 const chunkKante = 25
-const walkSpeed = 150
+let walkSpeed = 200
+let furthestPos
 let tastenEingabe = false
 c.width = chunkKante * (~~((window.innerWidth) / chunkKante))
 c.height = chunkKante * (~~((window.innerHeight) / chunkKante))
@@ -134,6 +135,45 @@ function grubeB(a) {
 	}
 	return out
 }
+function ozeanSteineB(a) {
+	let out = einfarbigB(a, [0, 0, 255])
+	let size = a >> 2
+	let amount = ~~(a / 6)
+	for (let i = 0; i < amount; i++) {
+		let centerX = ~~(Math.random() * (a - (size << 1))) + size
+		let centerY = ~~(Math.random() * (a - (size << 1))) + size
+		for (let x = -size; x < size; x++) {
+			for (let y = -size; y < size; y++) {
+				let dis = (x ** 2 + y ** 2) * 0.5
+				if (dis < size) {
+					let pos = cord(centerX + x, centerY + y, a)
+					out[pos] = [75, 75, 75]
+				}
+			}
+		}
+	}
+	return out
+}
+function seeSteineB(a) {
+	let out = einfarbigB(a, [0, 0, 175])
+	let size = a >> 2
+	let amount = ~~(a / 6)
+	for (let i = 0; i < amount; i++) {
+		let centerX = ~~(Math.random() * (a - (size << 1))) + size
+		let centerY = ~~(Math.random() * (a - (size << 1))) + size
+		for (let x = -size; x < size; x++) {
+			for (let y = -size; y < size; y++) {
+				let dis = (x ** 2 + y ** 2) * 0.5
+				if (dis < size) {
+					let pos = cord(centerX + x, centerY + y, a)
+					out[pos] = [75, 75, 75]
+				}
+			}
+		}
+	}
+	return out
+}
+let flussSteineB = (a) => ozeanSteineB(a)
 function generiereBöden() {
 	let scale = ~~(Math.max(ctx.canvas.width, ctx.canvas.height) / 25)
 	let bodenTextur = [
@@ -141,7 +181,7 @@ function generiereBöden() {
 		teichB, flussB, strandB,
 		schwarzB, buschBeerenB, baumB,
 		buschB, miniBaumB, miniBuschB,
-		erdeB, grubeB
+		erdeB, grubeB, ozeanSteineB, flussSteineB, seeSteineB
 	]
 	let out = []
 	for (let x = 0; x < bodenTextur.length; x++) {
@@ -150,36 +190,8 @@ function generiereBöden() {
 	return out
 }
 let color = generiereBöden()
-let boden = [1, 2, 5, 12, 15]
-// Gelände:
-// 0 = ozean
-// 1 = gras
-// 2 = stein
-// 3 = teich
-// 4 = fluss
-// 5 = strand
-// 6 = schwarz
-// 7 = Busch (mit Beeren)
-// 8 = Baum
-// 9 = Busch (ohne Beeren)
-// 10= miniBaum
-// 11= miniBusch
-// 12= erde
-// 13= grube
-//Items:
-// 0 = nichts
-// 1 = beere
-// 2 = stock
-// 3 = stein
-// 4 = axt
-// 5 = holz
-// 6 = Nuss
-// 7 = gras
-// 8 = seil
-// 9 = angel
-// 10= Brett
-// 11 = schaufel
-// 12 = erde
+let boden = [1, 2, 5, 12, , 14, 15, 16]
+let notPickUp = [13]
 let rezept = {
 	"0g7": "1g9",
 	"0g9": "2g1",
@@ -188,14 +200,43 @@ let rezept = {
 	"4g8": "5g1",
 	"0g8": "6g8",
 	"11g12": "12g13",
-	"12g13": "0g12"
+	"12g13": "0g12",
+	"3g0": "0g14",
+	"3g4": "0g15",
+	"3g3": "0g16",
+	"0g14": "3g0",
+	"0g15": "3g4",
+	"0g16": "3g3",
+	"9g0": "13g0",
+	"9g3": "13g3",
+	"9g4": "13g4",
+	"1g13": "0g13",
+	"2g13": "0g13",
+	"3g13": "0g13",
+	"5g13": "0g13",
+	"6g13": "0g13",
+	"7g13": "0g13",
+	"8g13": "0g13",
+	"10g13": "0g13",
+	"15g13": "0g13",
+	"18g13": "0g13",
+	"0g10": "2g1",
+	"0g11": "2g1",
 }
 let craft = {
-	"2i3": "4",
-	"2i8": "9",
-	"5i5": "10",
-	"7i7": "8",
-	"2i10": "11"
+	"2i3": "4i0",
+	"2i8": "9i0",
+	"7i7": "8i0",
+	"2i10": "11i0",
+	"4i5": "4i10",
+	"4i10": "4i16",
+	"0i16": "18i17",
+	"0i17": "18i18",
+	"18i18": "0i17",
+	"18i17": "0i16",
+	"18i3": "4i0",
+	"18i8": "9i0",
+	"18i10": "11i0"
 }
 let abs = (a) => Math.abs(a)
 let kant = (a) => a.length ** 0.5
@@ -314,7 +355,7 @@ function zoom(list, depth, mul) {
 		return zoom(neuList, depth - 1, mul)
 	}
 }
-function createFrame(height, tagged, colors, areaItems) {
+function createFrame(height, colors, areaItems) {
 	const pow = height.length
 	const kante = Math.sqrt(pow)
 	const col = colors || Array(pow).fill(6)
@@ -326,40 +367,29 @@ function createFrame(height, tagged, colors, areaItems) {
 	for (let y = 0; y < kante; y++) {
 		for (let x = 0; x < kante; x++) {
 			const pos = y * kante + x
-			if (tagged[pos] != 0) {
-				const farben = color[col[pos]]
-				const overFarbe = 255 - (height[pos] - NN) * (1 / ((100 - NN) / 100)) * 1.5
+			const farben = color[col[pos]]
+			const overFarbe = 255 - (height[pos] - NN) * (1 / ((100 - NN) / 100)) * 1.5
+			for (let n = 0; n < div; n++) {
+				for (let m = 0; m < div; m++) {
+					const farbe = farben[n + m * div]
+					const pixel = (x * div + y * breite + m * min + n) << 2
+					image.data[pixel] = farbe[0]
+					image.data[pixel + 1] = farbe[1]
+					image.data[pixel + 2] = farbe[2]
+					image.data[pixel + 3] = overFarbe
+				}
+			}
+			if (areaItems[pos] != 0) {
+				let picture = textures[areaItems[pos] - 1]
 				for (let n = 0; n < div; n++) {
 					for (let m = 0; m < div; m++) {
-						const farbe = farben[n + m * div]
 						const pixel = (x * div + y * breite + m * min + n) << 2
-						image.data[pixel] = farbe[0]
-						image.data[pixel + 1] = farbe[1]
-						image.data[pixel + 2] = farbe[2]
-						image.data[pixel + 3] = overFarbe
-					}
-				}
-				if (areaItems[pos] != 0) {
-					let picture = textures[areaItems[pos] - 1]
-					for (let n = 0; n < div; n++) {
-						for (let m = 0; m < div; m++) {
-							const pixel = (x * div + y * breite + m * min + n) << 2
-							const colored = picture[cord(n, m, div)]
-							if (colored != 0) {
-								image.data[pixel] = colored[0]
-								image.data[pixel + 1] = colored[1]
-								image.data[pixel + 2] = colored[2]
-							}
+						const colored = picture[cord(n, m, div)]
+						if (colored != 0) {
+							image.data[pixel] = colored[0]
+							image.data[pixel + 1] = colored[1]
+							image.data[pixel + 2] = colored[2]
 						}
-					}
-				}
-			} else {
-				const farbe = ~~(height[pos] * (100 / NN) * 2.55)
-				for (let n = 0; n < div; n++) {
-					for (let m = 0; m < div; m++) {
-						const pixel = (x * div + y * breite + m * min + n) << 2
-						image.data[pixel + 2] = farbe
-						image.data[pixel + 3] = 255
 					}
 				}
 			}
@@ -956,15 +986,18 @@ function findStart(inseln, map) {
 	let insel = inseln[smalInd]
 	let strand = insel[4]
 	let pos = strand[0]
+	let einleitungPos = strand[1]
 	for (let x = 0; x < strand.length; x++) {
 		if (insel[7][strand[x]] != 4) {
 			pos = strand[x]
+			einleitungPos = strand[x + 1]
 			break
 		}
 	}
 	let bewegt = insel[5]
 	let x = pos % bewegt[2] + bewegt[0]
 	let y = ~~(pos / bewegt[2]) + bewegt[1]
+	allItems[cord(einleitungPos % bewegt[2] + bewegt[0], ~~(einleitungPos / bewegt[2]) + bewegt[1], weltKante)] = 19
 	return cord(x, y, map.length ** 0.5)
 }
 function generate(wasserPerc, auflösung) {
@@ -986,6 +1019,15 @@ function generate(wasserPerc, auflösung) {
 }
 function male() {
 	if (updateScreen) {
+		let insel = chunks[chunkInd(playerPos)][4][chunkPos(playerPos)]
+		if (insel != counters[15] && insel != 0 && counters[16] == 0 && counters[13] == 1) {
+			counters[16] = 1
+			letter(["Hier, der letzte Zettel", 10], `Hi,
+this is the End of my Game. You have successfully solved every riddle!
+I hope you had fun playing :)
+
+derBohrman`, "paper_3.txt")
+		}
 		updateScreen = false
 		let xNull = playerPos % weltKante - (chunkKante >> 1)
 		let yNull = ~~(playerPos / weltKante) - (chunkKante >> 1)
@@ -1043,7 +1085,7 @@ function male() {
 			}
 			if (chunkFrame == 0) {
 				let chunk = chunks[chunkIndex]
-				chunk[0] = chunkFrame = createFrame(chunk[3], chunk[4], chunk[1], chunk[2])
+				chunk[0] = chunkFrame = createFrame(chunk[3], chunk[1], chunk[2])
 			}
 			ctx.putImageData(chunkFrame, (xPlayerOff - xOffset) * scale - widthOffset, (yPlayerOff - yOffset) * scale - heightOffset)
 		}
@@ -1125,23 +1167,25 @@ function findWay(startPos, zielPos) {
 		while (changed.length > 0 && nächstesPos.length == 0) {
 			let neu = []
 			for (let x = 0; x < changed.length; x++) {
-				for (let y = 0; y < 4; y++) {
+				for (let y = 0; y < 8; y++) {
 					let pos = posRich(changed[x], y, weltKante)
 					if (!tested[pos]) {
 						tested[pos] = 1
+						neu.push(pos)
 						if (dis[pos] != -1) {
-							nächstesPos.push(pos)
+							nächstesPos.push([pos, y])
 						}
 					}
-					neu.push(pos)
 				}
 			}
 			changed = neu
 		}
-		let bestPos = nächstesPos[0]
+		let bestPos = nächstesPos[0][0]
+		let schräg = nächstesPos[0][1] > 3
 		for (let x = 1; x < nächstesPos.length; x++) {
-			if (dis[bestPos] > dis[nächstesPos[x]]) {
-				bestPos = nächstesPos[x]
+			if ((dis[bestPos] > dis[nächstesPos[x][0]] && schräg == (nächstesPos[x][1] > 3)) || (schräg && !(nächstesPos[x][1] > 3) && dis[bestPos] == dis[nächstesPos[x][0]])) {
+				bestPos = nächstesPos[x][0]
+				schräg = nächstesPos[x][1] > 3
 			}
 		}
 		zielPos = bestPos
@@ -1165,6 +1209,11 @@ function walk(weg, pickup) {
 	walkable = true
 	let endAction = pickup || 0
 	if (weg.length == 0) {
+		walkable = beforeWalking
+		if (endAction != 0) {
+			endAction()
+			updateScreen = true
+		}
 		return
 	}
 	let positions = Array(weg.length)
@@ -1234,31 +1283,53 @@ function interrupt(resolve, stopper) {
 function changeBlock(dir) {
 	updateScreen = true
 	let pos = posRich(playerPos, dir, weltKante)
-	if (bodenTyp(pos) == 0) {
-		return
-	}
 	let chunk = chunks[chunkInd(pos)]
 	let old = bodenTyp(pos)
 	let oldData = `${holding}g${old}`
 	let neuData = rezept[oldData] || oldData
 	let item = chunks[chunkInd(pos)][2][chunkPos(pos)]
+	if (holding == 0 && chunk[2][chunkPos(pos)] == 0 && counters[8] == 0 && counters[12] == 1 && counters[13] == 0 && pos == furthestPos) {
+		chunk[2][chunkPos(pos)] = 21
+		showPopup("Another piece of paper!", 10)
+		chunk[0] = 0
+		return
+	}
+	if (holding == 0 && chunk[2][chunkPos(pos)] == 0 && old == 13 && counters[14] == 0) {
+		counters[14] = 1
+		chunk[2][chunkPos(pos)] = 22
+		showPopup("This seems to be old...", 10)
+		chunk[0] = 0
+		return
+	}
 	if ((oldData == neuData && boden.includes(old)) || item != 0) {
 		let bodenItem = chunk[2][chunkPos(pos)]
-		if (item == 0) {
+		let a = holding
+		let b = item
+		let c = "-1"
+		let neu = (craft[`${a}i${b}`] || craft[`${b}i${a}`]) || c
+		if (neu != c) {
+			let neuList = neu.split("i")
+			holding = parseInt(neuList[0])
+			bodenItem = parseInt(neuList[1])
+			if (bodenItem == 16 && counters[10] == 0) {
+				counters[10] = 1
+				showPopup("chopped Wood?", 10)
+			}
+		} else if (item == 0) {
 			bodenItem = holding
 			holding = 0
-		} else if (holding == 0) {
+			if (bodenItem == 11 && old == 1 && counters[6] == 0) {
+				counters[6] = 1
+				showPopup("The shovel slips over the Gras without making a dent", 10)
+			} else if (oldData == "0g5" && counters[11] == 1 && counters[12] == 0 && counters[22] == 0) {
+				counters[22] = 1
+				bodenItem = 21
+				showPopup("Oh, a piece of Paper.", 10)
+			}
+		} else if (holding == 0 && !notPickUp.includes(bodenItem)) {
 			holding = item
 			bodenItem = 0
-		} else {
-			let a = holding
-			let b = item
-			let c = "-1"
-			let neu = (craft[`${a}i${b}`] || craft[`${b}i${a}`]) || c
-			if (neu != c) {
-				holding = parseInt(neu)
-				bodenItem = 0
-			}
+			pickupActions(pos, holding)
 		}
 		chunk[2][chunkPos(pos)] = bodenItem
 		chunk[0] = 0
@@ -1274,6 +1345,10 @@ function changeBlock(dir) {
 		let neuItem = parseInt(neuList[0])
 		if (holding == 0) {
 			holding = neuItem
+			if (holding == 1 && counters[7] == 0) {
+				counters[7] = 1
+				showPopup("This is supposed to be a berry?...\nNo, you can't eat it!!!", 10)
+			}
 		} else if (neuItem == 0) {
 			holding = 0
 		} else {
@@ -1284,7 +1359,6 @@ function changeBlock(dir) {
 	}
 }
 function beere(a) {
-	//a=kante
 	const pow = a ** 2
 	let out = Array(pow).fill(0)
 	for (let x = -(a / 10); x < a / 10; x++) {
@@ -1514,12 +1588,239 @@ function erde(a) {
 	}
 	return out
 }
+function angelSchatz(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	let size = a >> 2
+	let amount = a >> 4
+	for (let i = 0; i < amount; i++) {
+		let centerX = ~~(Math.random() * (a - (size << 1))) + size
+		let centerY = ~~(Math.random() * (a - (size << 1))) + size
+		for (let x = -size; x < size; x++) {
+			for (let y = -size; y < size; y++) {
+				let dis = (x ** 2 + y ** 2) * 0.5
+				if (abs(dis - size) < a >> 4) {
+					let pos = cord(centerX + x, centerY + y, a)
+					out[pos] = [222, 222, 222]
+				}
+			}
+		}
+	}
+	for (let x = 0; x < a; x++) {
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			if (Math.random() < 0.001) {
+				out[pos] = [222, 222, 222]
+			}
+		}
+	}
+	return out
+}
+function schuh(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let y = a >> 1; y < a; y++) {
+		for (let x = -(a >> 3); x < a >> 3; x++) {
+			let pos = cord(x + (a >> 1), y, a)
+			out[pos] = [48, 39, 58]
+		}
+	}
+	for (let y = ~~(a / 3); y < a >> 1; y++) {
+		for (let x = -~~(a / 6); x < a / 6; x++) {
+			let pos = cord(x + (a >> 1), y, a)
+			out[pos] = [32, 24, 40]
+		}
+	}
+	for (let y = ~~(a * 0.8); y < a; y++) {
+		for (let x = 0; x < a >> 1; x++) {
+			let pos = cord(x + (a >> 1), y, a)
+			out[pos] = [48, 39, 58]
+		}
+	}
+	for (let y = ~~(a * 0.95); y < a; y++) {
+		for (let x = -(a >> 3); x < a >> 1; x++) {
+			let pos = cord(x + (a >> 1), y, a)
+			out[pos] = [0, 0, 0]
+		}
+	}
+	return out
+}
+function fisch(a) {
+	const pow = a ** 2
+	let centerX = ~~(a * 0.85)
+	let centerY = (a >> 1) - ~~(((a >> 1) - abs(centerX - (a >> 1))) ** 0.75)
+	let out = Array(pow).fill(0)
+	for (let x = 0; x < a; x++) {
+		for (let y = -~~(((a >> 1) - abs(x - (a >> 1))) ** 0.75); y < ((a >> 1) - abs(x - (a >> 1))) ** 0.75; y++) {
+			let pos = cord(x, y + (a >> 1), a)
+			if (y > 0) {
+				out[pos] = [62 + y * (a >> 1), 219 - y * (a >> 3), 224 - y * (a >> 3)]
+			} else {
+				out[pos] = [62, 219, 224]
+			}
+		}
+	}
+	for (let x = 0; x < a >> 1; x++) {
+		for (let y = -abs((a >> 1) - x) >> 1; y < abs((a >> 1) - x) >> 1; y++) {
+			let pos = cord(x, y + (a >> 1), a)
+			out[pos] = [62, 219, 224]
+		}
+	}
+	for (let x = ~~(a * 0.88); x < a; x++) {
+		let pos = cord(x, a >> 1, a)
+		out[pos] = [0, 0, 0]
+	}
+	let size = Math.max(a >> 5, 2)
+	for (let x = -size; x < size; x++) {
+		for (let y = -size; y < size; y++) {
+			let dis = (x ** 2 + y ** 2) * 0.5
+			if (dis <= size) {
+				let pos = cord(centerX + x, centerY + y, a)
+				out[pos] = [0, 0, 0]
+			}
+		}
+	}
+	return out
+}
+function dreiStäbe(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let x = ~~(1 * (a / 7)); x < ~~(2 * (a / 7)); x++) {
+		let farbe = ((Math.random() - 0.5) / 4) + 1
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			let all = (Math.random() - 0.5) * 16
+			out[pos] = [166 * farbe + all, 94 * farbe + all, 35 * farbe + all]
+		}
+	}
+	for (let x = ~~(3 * (a / 7)); x < ~~(4 * (a / 7)); x++) {
+		let farbe = ((Math.random() - 0.5) / 4) + 1
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			let all = (Math.random() - 0.5) * 16
+			out[pos] = [166 * farbe + all, 94 * farbe + all, 35 * farbe + all]
+		}
+	}
+	for (let x = ~~(5 * (a / 7)); x < ~~(6 * (a / 7)); x++) {
+		let farbe = ((Math.random() - 0.5) / 4) + 1
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			let all = (Math.random() - 0.5) * 16
+			out[pos] = [166 * farbe + all, 94 * farbe + all, 35 * farbe + all]
+		}
+	}
+	return out
+}
+function zweiStäbe(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let x = ~~(1 * (a / 7)); x < ~~(2 * (a / 7)); x++) {
+		let farbe = ((Math.random() - 0.5) / 4) + 1
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			let all = (Math.random() - 0.5) * 16
+			out[pos] = [166 * farbe + all, 94 * farbe + all, 35 * farbe + all]
+		}
+	}
+	for (let x = ~~(3 * (a / 7)); x < ~~(4 * (a / 7)); x++) {
+		let farbe = ((Math.random() - 0.5) / 4) + 1
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			let all = (Math.random() - 0.5) * 16
+			out[pos] = [166 * farbe + all, 94 * farbe + all, 35 * farbe + all]
+		}
+	}
+	return out
+}
+function stab(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let x = ~~(3 * (a / 7)); x < ~~(4 * (a / 7)); x++) {
+		let farbe = ((Math.random() - 0.5) / 4) + 1
+		for (let y = 0; y < a; y++) {
+			let pos = cord(x, y, a)
+			let all = (Math.random() - 0.5) * 16
+			out[pos] = [166 * farbe + all, 94 * farbe + all, 35 * farbe + all]
+		}
+	}
+	return out
+}
+function text(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let y = 0; y < a; y++) {
+		for (let x = a >> 3; x < a - (a >> 3); x++) {
+			let pos = cord(x, y, a)
+			out[pos] = [222, 222, 222]
+		}
+	}
+	for (let z = a >> 3; z < a - (a >> 3); z += a >> 3) {
+		for (let x = ~~(a / 6); x < a - (a / 6); x++) {
+			for (let y = -Math.max((a >> 5), 1); y < Math.max(a >> 5, 1); y++) {
+				if (out[cord(x, y + (a >> 1) + z, a)] != 0) {
+					out[cord(x, y + (a >> 1) + z, a)] = [22, 22, 22]
+				}
+			}
+		}
+	}
+	return out
+}
+function landkarte(a) {
+	let geländeFarben = [
+		[0, 0, 255], [0, 0, 255], [0, 0, 255], [0, 150, 0], [0, 150, 0], [75, 75, 75], [0, 0, 175], [255, 204, 0]
+	]
+	const pow = a ** 2
+	let out = Array(pow).fill([235, 234, 171])
+	for (let y = a >> 5; y < a - (a >> 5); y++) {
+		for (let x = a >> 5; x < a - (a >> 5); x++) {
+			let pos = cord(x, y, a)
+			out[pos] = geländeFarben[~~(Math.random() * geländeFarben.length)]
+		}
+	}
+	return out
+}
+function zettel(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let y = 0; y < a >> 2; y++) {
+		for (let x = -y; x < y; x++) {
+			let pos = cord(x + a >> 1, y + a >> 1, a)
+			out[pos] = [222, 222, 222]
+		}
+	}
+	return out
+}
+function buch(a) {
+	const pow = a ** 2
+	let out = Array(pow).fill(0)
+	for (let y = a >> 5; y < a - (a >> 5); y++) {
+		for (let x = a >> 3; x < a - (a >> 3); x++) {
+			let pos = cord(x, y, a)
+			hell = (Math.random() - 0.5) * 30
+			out[pos] = [136 + hell, 64 + hell, 20 + hell]
+		}
+	}
+	for (let x = ~~(a / 6); x < a - (a / 6); x++) {
+		for (let y = -Math.max((a >> 5), 1); y < Math.max(a >> 5, 1); y++) {
+			let z = -(a >> 2)
+			out[cord(x, y + (a >> 1) + z, a)] = [22, 22, 22]
+			if (Math.random() < 0.3) {
+				out[cord(x, y + (a >> 1) + z, a)] = [116, 44, 0]
+			}
+		}
+	}
+	return out
+}
 function texture(scale) {
 	let itemTextur = [
 		beere, stock, stein,
 		axt, holz, nuss,
 		gras, seil, angel,
-		brett, schaufel, erde
+		brett, schaufel, erde,
+		angelSchatz, schuh, fisch,
+		dreiStäbe, zweiStäbe, stab,
+		text, landkarte, zettel,
+		buch
 	]
 	let out = []
 	for (let x = 0; x < itemTextur.length; x++) {
@@ -1650,18 +1951,43 @@ function liegendesGras(pos, time) {
 function speicherErinnerung(pos, time) {
 	if (counters[1] == 0) {
 		if (time >= 40) {
-			showPopup("Denke mal dran das spiel zu speichern.\nTipp:\ndie dafür benötigten knöpfe könen durch runterscrollen gefunden werden.", 10)
+			showPopup("Don't forget to save your progress.\nHint:\nthe Buttons for that can be found below.", 10)
 		} else {
 			return [pos, time + 1, 7]
 		}
 	}
 	return 0
 }
+function liegenderAngelschatz(pos) {
+	setTimeout(function () {
+		let chunk = chunks[chunkInd(pos)]
+		if (chunk[2][chunkPos(pos)] == 13) {
+			if (counters[2] + counters[3] + counters[8] > 0) {
+				let zufall = ~~(Math.random() * (counters[2] + counters[3] + counters[8]))
+				if (zufall < counters[2]) {
+					counters[2]--
+					chunk[2][chunkPos(pos)] = 14
+				} else if (zufall < counters[2] + counters[3]) {
+					counters[3]--
+					chunk[2][chunkPos(pos)] = 15
+				} else {
+					counters[8]--
+					chunk[2][chunkPos(pos)] = 20
+				}
+			} else {
+				chunk[2][chunkPos(pos)] = 15
+			}
+			updateScreen = true
+			chunk[0] = 0
+		}
+	}, 500)
+	return 0
+}
 function itemAction(pos, item) {
 	let actions = [
-		liegendeBeere, liegendeNuss, liegendesGras
+		liegendeBeere, liegendeNuss, liegendesGras, liegenderAngelschatz
 	]
-	let actionedItems = [1, 6, 7]
+	let actionedItems = [1, 6, 7, 13]
 	if (actionedItems.includes(item)) {
 		let result = actions[actionedItems.indexOf(item)](pos, 0)
 		if (result != 0) {
@@ -1669,13 +1995,121 @@ function itemAction(pos, item) {
 		}
 	}
 }
+function grubeGraben() {
+	if (counters[5] == 0) {
+		counters[5] = 1
+		showPopup("This Hole is so deep, most stuff just gets lost in it.", 10)
+	}
+	return 0
+}
 function groundAction(pos, ground) {
 	let actions = [
-		wachseBeeren, wachseGras
+		wachseBeeren, wachseGras, grubeGraben
 	]
-	let actionedGrounds = [9, 12]
+	let actionedGrounds = [9, 12, 13]
 	if (actionedGrounds.includes(ground)) {
 		let result = actions[actionedGrounds.indexOf(ground)](pos, 0)
+		if (result != 0) {
+			waitingStuff.push(result)
+		}
+	}
+}
+function schuhAnziehen() {
+	holding = 0
+	walkSpeed = 150
+	counters[4] = 1
+	showPopup("SPEED BUFF!", 10)
+	return 0
+}
+function textLesen() {
+	holding = 0
+	counters[11] = 1
+	letter(["Oh, a Letter!\nwhat? why did ir escape into Donwloads?", 10], `Hi,
+nice you give this Game a try! Explore a generated World and solve fun riddles.
+You can interact with your enviroment by clicking. In fact, you only need to click.
+For a better experience, go into full Screen by clicking F11. Don't forget to save your Progress from time to time.
+\"No Backup, no mercy\"
+In case you are able to find a Bug, you can report it to me :)
+
+derBohrman`, "intro.txt")
+	return 0
+}
+function kartenDownload() {
+	holding = 0
+	showPopup("nice map", 10)
+	const canvas = document.createElement('canvas')
+	const context = canvas.getContext('2d')
+	const image = context.createImageData(weltKante, weltKante)
+	canvas.width = weltKante
+	canvas.height = weltKante
+	for (let x = 0; x < map.length; x++) {
+		const chunk = chunks[chunkInd(x)]
+		const überWasser = ~~(chunk[4][chunkPos(x)] > 0)
+		const höhe = chunk[3][chunkPos(x)]
+		const pixel = x << 2
+		if (überWasser) {
+			const helligkeit = ~~((höhe - counters[9]) * (100 / (100 - counters[9])) * 2.55)
+			image.data[pixel] = helligkeit
+			image.data[pixel + 1] = helligkeit
+			image.data[pixel + 2] = helligkeit
+		} else {
+			image.data[pixel] = 0
+			image.data[pixel + 1] = 0
+			image.data[pixel + 2] = ~~(höhe * (100 / counters[9]) * 2.55)
+		}
+		image.data[pixel + 3] = 255
+	}
+	const redPixel = furthestPos << 2
+	image.data[redPixel] = 255
+	image.data[redPixel + 1] = 0
+	image.data[redPixel + 2] = 0
+	context.putImageData(image, 0, 0)
+	const dataUrl = canvas.toDataURL('image/png')
+	const link = document.createElement('a')
+	link.href = dataUrl
+	link.download = 'worldMap.png'
+	link.click()
+	return 0
+}
+function sandZettel() {
+	holding = 0
+	if (counters[12] == 0) {
+		counters[12] = 1
+		letter(["What is written there?", 10], "011110111000101000001010001001011010010100000100000000100100100110000010011010010111000100000000010101001011100010100000101000111101100011000010100000100110000100011010000010100000000000001010010000011010100011010000010101110000000000100010001011001000000100111000000101010010001101000001011001010000011000000110100110100000000000010100010110100110101010000000001100010101000011000010101110000000111010101100100000001110011110001101000000001101000001010000110000101011100000001101010011010000000101010111000101011100010001100010010001101000000001101001001001100011000101100100111000000101010110100000001010100101110001010111000000000100010101100010010010100010001110010101110000001010000101110001010000000001010100000101100100000010101011101001101001000110100000101100100000011010101010000000011011110010001001001011001000101011100000000000001011001001000000010110010100001010000001011000011001010100001010000000100101011001000011010000000000001011100011100101011000000000000100111000110010101000000001101", "paper_1.txt")
+	} else {
+		counters[13] = 1
+		letter(["Another one?!", 10], "JKHJFZGGPSIGQMMAGRQTFU", "paper_2.txt")
+	}
+	return 0
+}
+function chroniken() {
+	holding = 0
+	letter(["an old Book?", 10], `Breadth-First Search (BFS) is one of the most fundamental algorithms in computer science, particularly in the domain of graph theory. It is used to traverse or search through graph data structures in a systematic way. Unlike Depth-First Search (DFS), which goes as deep as possible before backtracking, BFS explores all the neighbor nodes at the present depth prior to moving on to nodes at the next depth level.
+
+How BFS Works
+
+BFS uses a queue to keep track of the next location to visit. It starts at a chosen source node and visits all its immediate neighbors before moving to the neighbors of those neighbors. This level-by-level approach makes it very useful for finding the shortest path in unweighted graphs.
+
+Step-by-step:
+1. Start with the root node (or any arbitrary node as the starting point).
+2. Enqueue the root node and mark it as visited.
+3. Dequeue a node from the front of the queue.
+4. For each unvisited adjacent node, mark it as visited and enqueue it.
+5. Repeat steps 3 and 4 until the queue is empty.
+
+Time and Space Complexity
+
+The time complexity of BFS is O(V + E), where V is the number of vertices and E is the number of edges in the graph. This is because every vertex and every edge will be explored in the worst case. The space complexity is also O(V), as the queue may hold all the vertices in the worst case.`, "book.txt")
+	return 0
+}
+function pickupActions(pos, item) {
+	let actions = [
+		schuhAnziehen, textLesen, kartenDownload,
+		sandZettel, chroniken
+	]
+	let actionedItems = [14, 19, 20, 21, 22]
+	if (actionedItems.includes(item)) {
+		let result = actions[actionedItems.indexOf(item)](pos, 0)
 		if (result != 0) {
 			waitingStuff.push(result)
 		}
@@ -1692,7 +2126,7 @@ function createChunks(generated, weltItems) {
 		let chunkBodenTyp = Array(chunkGröße).fill(0)
 		let chunkHöhen = Array(chunkGröße).fill(0)
 		let chunkItems = Array(chunkGröße).fill(0)
-		let chunkÜberWasser = Array(chunkGröße).fill(0)
+		let inselRef = Array(chunkGröße).fill(0)
 		const xChunkNull = chunkIndex % kant(chunkData) * chunkKante
 		const yChunkNull = ~~(chunkIndex / kant(chunkData)) * chunkKante
 		for (let x = 0; x < chunkKante; x++) {
@@ -1701,8 +2135,8 @@ function createChunks(generated, weltItems) {
 				const weltPos = cord(x + xChunkNull, y + yChunkNull, weltKante)
 				chunkHöhen[chunkPosistion] = weltHöhen[weltPos]
 				chunkItems[chunkPosistion] = weltItems[weltPos]
-				chunkÜberWasser[chunkPosistion] = ~~(inselPointer[weltPos] > 0)
-				if (chunkÜberWasser[chunkPosistion]) {
+				inselRef[chunkPosistion] = inselPointer[weltPos]
+				if (inselRef[chunkPosistion]) {
 					const insel = inseln[inselPointer[weltPos] - 1]
 					const xInselNull = insel[5][0]
 					const yInselNull = insel[5][1]
@@ -1719,9 +2153,28 @@ function createChunks(generated, weltItems) {
 		chunkData[chunkIndex].push(chunkBodenTyp)
 		chunkData[chunkIndex].push(chunkItems)
 		chunkData[chunkIndex].push(chunkHöhen)
-		chunkData[chunkIndex].push(chunkÜberWasser)
+		chunkData[chunkIndex].push(inselRef)
 	}
 	return chunkData
+}
+function furthestAway(pos) {
+	let tested = Array(weltKante).fill(false)
+	tested[pos] = 0
+	let changed = [pos]
+	while (changed.length > 0) {
+		let neu = []
+		for (let x = 0; x < changed.length; x++) {
+			for (let y = 0; y < 4; y++) {
+				let neuPos = posRich(changed[x], y, weltKante)
+				if (!tested[neuPos] && boden.includes(chunks[chunkInd(neuPos)][1][chunkPos(neuPos)])) {
+					tested[neuPos] = true
+					furthestPos = neuPos
+					neu.push(neuPos)
+				}
+			}
+		}
+		changed = neu
+	}
 }
 let map, tagged, inseln, NN, weltGröße, weltKante, playerPos, xPlayerOff, yPlayerOff, holding, walkable, allItems, textures, chunks, counters, waitingStuff, lastAction
 function main() {
@@ -1734,26 +2187,24 @@ function main() {
 	NN = generated[3]
 	weltGröße = map.length
 	weltKante = weltGröße ** 0.5
+	allItems = Array(map.length).fill(0)
 	playerPos = findStart(inseln, map)
 	xPlayerOff = 0
 	yPlayerOff = 0
 	holding = 0
-	lastAction = ""
 	walkable = true
-	allItems = Array(map.length).fill(0)
 	textures = texture(scale)
-	//Lege Items und gelände hin
-	/*	let localPos = playerPos
-		for (let x = 1; x < textures.length + 1; x++) {
-			localPos = posRich(localPos, 1, kant(map))
-			allItems[localPos] = x
-		}*/
-	//ENDE
+	lastAction = `${textures.length}g0`
 	chunks = createChunks(generated, allItems)
+	furthestAway(playerPos)
 	stop("chunks")
-	//0 = time in ms
-	//1 = downloads
-	counters = Array(3).fill(0)
+	counters = Array(23).fill(0)
+	counters[2] = 1
+	counters[3] = 18
+	counters[8] = 1
+	counters[9] = NN
+	counters[15] = chunks[chunkInd(playerPos)][4][chunkPos(playerPos)]
+	counters[21] = furthestPos
 	timedFunctions = [
 		liegendeBeere, wachseBusch, wachseBeeren,
 		liegendeNuss, wachseBaum, wachseGras,
@@ -1865,6 +2316,15 @@ c.addEventListener('click', async function (event) {
 					}
 					walk(way, () => changeBlock(extraAction))
 					return
+				} else if (chunks[chunkInd(pos)][2][chunkPos(pos)] != 0) {
+					let xImaginPos = imaginPos % weltKante
+					let yImaginPos = ~~(imaginPos / weltKante)
+					let xPos = pos % weltKante
+					let yPos = ~~(pos / weltKante)
+					if (abs(xImaginPos - xPos) + abs(yImaginPos - yPos) == 1) {
+						walk(way, () => changeBlock(((xPos - xImaginPos) & 2) + (yPos - yImaginPos) + 1))
+						return
+					}
 				}
 			}
 			walk(way)
@@ -1942,139 +2402,140 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 				let abbrechen = false
 				const parsedData = JSON.parse(jsonContent)
 				if (parsedData.length != 4) {
-					throw new Error("Daten komisch, falsche länge an Datensätzen!")
+					throw new Error("Weird data, wrong amount of data!")
 				}
 				let neuChunks = parsedData[0]
 				if (neuChunks instanceof Array) {
 					let chunksDif = abs(chunks.length - neuChunks.length)
 					if (neuChunks.length < chunks.length) {
-						fehler += `\nEs fehlen ${chunksDif} Chunks`
+						fehler += `\ntotal of ${chunksDif} missing chunks`
 						abbrechen = true
 					} else if (chunks.length < neuChunks.length) {
-						fehler += `\nEs gibt ${chunksDif} zu viel`
+						fehler += `\n${chunksDif} chunks too much`
 						neuChunks.splice(-chunksDif)
 					}
 					for (let x = 0; x < neuChunks.length; x++) {
 						let chunk = neuChunks[x]
 						if (!(chunk instanceof Array) || chunk.length != 5) {
-							fehler += `\nChunk ${x} hat eine Falsche menge an Datensätzen (${chunk.length} statt 5)`
+							fehler += `\nChunk ${x} has too much data (${chunk.length} instead of 5)`
 							abbrechen = true
 							continue
 						}
 						if (chunk[0] != 0) {
-							fehler += `\nChunk ${x} hat Daten an einer Stelle an der kein Bild gespeichert ist.`
+							fehler += `\nChunk ${x} has data where it shouldn't.`
 							chunk[0] = 0
 						}
 						if (chunk[1] instanceof Array) {
 							if (chunk[1].length != chunkKante ** 2) {
-								fehler += `\nChunk ${x} hat eine Falsche menge an Bodentypen (${chunk[1].length} statt ${chunkKante ** 2})`
+								fehler += `\nChunk ${x} has too much ground pieces (${chunk[1].length} instead of ${chunkKante ** 2})`
 								abbrechen = true
 							}
 							for (let y = 0; y < Math.min(chunk[1].length, chunkKante ** 2); y++) {
 								if (Number.isFinite(chunk[1][y])) {
 									if (~~chunk[1][y] != chunk[1][y] || chunk[1][y] >= color.length || chunk[1][y] < 0) {
-										fehler += `\nChunk ${x} hat einen unbekannten Bodentyp an Stelle ${y}: ${chunk[1][y]}`
+										fehler += `\nChunk ${x} has unknown ground type ${y}: ${chunk[1][y]}`
 										abbrechen = true
 									}
 								} else {
-									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Bodenwert an Stelle ${y}`
+									fehler += `\nChunk ${x} has unreadable ground type at ${y}`
 									abbrechen = true
 								}
 							}
 						} else {
-							fehler += `\nChunk ${x} hat keinen interpretierbaren Boden`
+							fehler += `\nChunk ${x} has no ground`
 							abbrechen = true
 						}
 						if (chunk[2] instanceof Array) {
 							if (chunk[2].length != chunkKante ** 2) {
-								fehler += `\nChunk ${x} hat eine Falsche menge an Items (${chunk[2].length} statt ${chunkKante ** 2})`
+								fehler += `\nChunk ${x} doesn't has the right amount of Items (${chunk[2].length} instead of ${chunkKante ** 2})`
 								abbrechen = true
 							}
 							for (let y = 0; y < Math.min(chunk[2].length, chunkKante ** 2); y++) {
 								if (Number.isFinite(chunk[2][y])) {
 									if (~~chunk[2][y] != chunk[2][y] || chunk[2][y] > textures.length || chunk[2][y] < 0) {
-										fehler += `\nChunk ${x} hat einen unbekanntes Item an Stelle ${y}: ${chunk[2][y]}`
+										fehler += `\nChunk ${x} has unknown item at ${y}: ${chunk[2][y]}`
 										chunk[2][y] = 0
 									}
 								} else {
-									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Itemwert an Stelle ${y}`
+									fehler += `\nChunk ${x} has unreadable item at ${y}`
 									chunk[2][y] = 0
 								}
 							}
 						} else {
-							fehler += `\nChunk ${x} hat keine interpretierbaren Itemwerte`
+							fehler += `\nChunk ${x} has no readable itemvalues`
 							abbrechen = true
 						}
 						if (chunk[3] instanceof Array) {
 							if (chunk[3].length != chunkKante ** 2) {
-								fehler += `\nChunk ${x} hat eine Falsche menge an Höhen (${chunk[3].length} statt ${chunkKante ** 2})`
+								fehler += `\nChunk ${x} has wrong amount of depths (${chunk[3].length} instead of ${chunkKante ** 2})`
 								abbrechen = true
 							}
 							for (let y = 0; y < Math.min(chunk[3].length, chunkKante ** 2); y++) {
 								if (Number.isFinite(chunk[3][y])) {
 									if (chunk[3][y] > 100 || chunk[3][y] < 0) {
-										fehler += `\nChunk ${x} hat eine zu extreme Höhe an Stelle ${y}: ${chunk[3][y]}`
+										fehler += `\nChunk ${x} is too high at ${y}: ${chunk[3][y]}`
 										chunk[3][y] = Math.max(Math.min(chunk[3][y], 100), 0)
 									}
 								} else {
-									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Höhenwert an Stelle ${y}`
+									fehler += `\nChunk ${x} has unreadable hight at ${y}`
 									abbrechen = true
 								}
 							}
 						} else {
-							fehler += `\nChunk ${x} hat keine interpretierbaren Höhenwerte`
+							fehler += `\nChunk ${x} has no readable depths`
 							abbrechen = true
 						}
 						if (chunk[4] instanceof Array) {
 							if (chunk[4].length != chunkKante ** 2) {
-								fehler += `\nChunk ${x} hat eine Falsche menge an Landmarkern (${chunk[4].length} statt ${chunkKante ** 2})`
+								fehler += `\nChunk ${x} wrong amount of land indicators (${chunk[4].length} instead of ${chunkKante ** 2})`
 								abbrechen = true
 							}
 							for (let y = 0; y < Math.min(chunk[4].length, chunkKante ** 2); y++) {
 								if (Number.isFinite(chunk[4][y])) {
-									if (!(chunk[4][y] == 1 || chunk[4][y] == 0)) {
-										fehler += `\nChunk ${x} hat keinen Boolean wert (0 oder 1) für den Landmarker an Stelle ${y}: ${chunk[4][y]}`
+									if (!(chunk[4][y] >= 0 && ~~chunk[4][y] == chunk[4][y])) {
+										fehler += `\nChunk ${x} has no integer Value at ${y}: ${chunk[4][y]}`
 										abbrechen = true
 									}
 								} else {
-									fehler += `\nChunk ${x} hat einen nicht interpretierbaren Landwert an Stelle ${y}`
+									fehler += `\nChunk ${x} has unreadable land value at ${y}`
 									abbrechen = true
 								}
 							}
 						} else {
-							fehler += `\nChunk ${x} hat keine interpretierbaren Landmarkerwerte`
+							fehler += `\nChunk ${x} has no land values`
 							abbrechen = true
 						}
 					}
 				} else {
-					fehler += `\nChunks nicht interpretierbar`
+					fehler += `\nChunks not readable`
 					abbrechen = true
 				}
 				let neuWaitingStuff = parsedData[1]
-				if (neuChunks instanceof Array) {
-					for (let x = 0; x < waitingStuff.length; x++) {
-						let warte = waitingStuff[x]
+				if (neuWaitingStuff instanceof Array) {
+					for (let x = 0; x < neuWaitingStuff.length; x++) {
+						let warte = neuWaitingStuff[x]
 						if (warte instanceof Array && warte.length == 3) {
 							if (!(Number.isFinite(warte[0]) && ~~warte[0] == warte[0] && warte[0] < map.length && warte[0] >= 0)) {
-								fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Position`
-								abbrechen = true
-							}
-							if (!(Number.isFinite(warte[1]) && warte[1] >= 0)) {
-								fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Zeit`
+								fehler += `\nwaitingdata ${x} has weird position`
+								neuWaitingStuff.splice(x, 1)
+								x--
+							} else if (!(Number.isFinite(warte[1]) && warte[1] >= 0)) {
+								fehler += `\nwaitindata ${x} has weird time`
 								warte[1] = 0
-							}
-							if (!(Number.isFinite(warte[2]) && ~~warte[2] == warte[2] && warte[2] < timedFunctions.length && warte[2] >= 0)) {
-								fehler += `\nwartedaten an stelle ${x} hat eine nicht interpretierbare Funktion`
-								abbrechen = true
+							} else if (!(Number.isFinite(warte[2]) && ~~warte[2] == warte[2] && warte[2] < timedFunctions.length && warte[2] >= 0)) {
+								fehler += `\nwaitingdata ${x} has weird function`
+								neuWaitingStuff.splice(x, 1)
+								x--
 							}
 						} else {
-							fehler += `\nwartedaten an stelle ${x} nicht interpretierbar`
-							abbrechen = true
+							fehler += `\nwaitingdata ${x} is weird: ${warte}`
+							neuWaitingStuff.splice(x, 1)
+							x--
 						}
 					}
 				} else {
-					fehler += `\nwartedaten nicht interpretierbar`
-					abbrechen = true
+					fehler += `\nwaitingdata not readable`
+					neuWaitingStuff = []
 				}
 				let neuCounters = parsedData[2]
 				if (neuCounters instanceof Array) {
@@ -2082,24 +2543,24 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 						for (let x = 0; x < neuCounters.length; x++) {
 							let counter = neuCounters[x]
 							if (!(Number.isFinite(counter) && ~~counter == counter && counter >= 0)) {
-								fehler += `\nZähler an stelle ${x} hat einen nicht interpretierbaren wert`
+								fehler += `\ncount at ${x} has weird value`
 								neuCounters[x] = 0
 							}
 						}
-					} else if(neuCounters.length < counters.length){
-						fehler += `\nFehlende Zählerwerte`
-						neuCounters.push(...Array(counters.length-neuCounters.length).fill(0))
-					}else{
-						fehler += `\nzu viele Zählerwerte`
-						neuCounters.splice(counters.length-neuCounters.length)
+					} else if (neuCounters.length < counters.length) {
+						fehler += `\nmissing counters`
+						neuCounters.push(...Array(counters.length - neuCounters.length).fill(0))
+					} else {
+						fehler += `\ntoo much counters`
+						neuCounters.splice(counters.length - neuCounters.length)
 					}
 				} else {
-					fehler += `\nZählerdaten nicht interpretierbar`
+					fehler += `\ncounterdata not readable`
 					neuCounters = Array(counters.length).fill(0)
 				}
 				let neuPlayerpos = parsedData[3]
 				if (!(Number.isFinite(neuPlayerpos) && ~~neuPlayerpos == neuPlayerpos && neuPlayerpos >= 0 && neuPlayerpos < map.length)) {
-					fehler += `\nSpielerposition hat einen nicht interpretierbaren wert`
+					fehler += `\nplayerposition unreadable`
 					abbrechen = true
 				}
 				if (abbrechen) {
@@ -2115,17 +2576,31 @@ document.getElementById('fileUpload').addEventListener('change', function (event
 					clearInterval(interruptId)
 					xPlayerOff = 0
 					yPlayerOff = 0
+					holding = counters[17]
+					lastAction = `${counters[19]}g${counters[18]}`
+					walkable = !!counters[20]
+					furthestPos = counters[21]
+					if (furthestPos == 0) {
+						furthestAway(playerPos)
+						counters[21] = furthestPos
+					}
+					NN = counters[9]
+					if (counters[4]) {
+						walkSpeed = 150
+					} else {
+						walkSpeed = 200
+					}
 					if (fehler != "") {
-						showPopup("Daten werden akzeptiert, aber:" + fehler, 10)
+						showPopup("Data accepted, BUT:" + fehler, 10)
 					}
 				}
 			} catch (error) {
-				showPopup('Da wurde Pfusch in der Json datei betrieben!\n' + error.message, 20)
+				showPopup('The Json seems to be broken!\n' + error.message, 20)
 			}
 		}
 		reader.readAsText(file)
 	} else {
-		showPopup('Dieses Dateiformat wird nicht unterstützt. Bitte verwende .json Dateien', 10)
+		showPopup('I do not know that filetype. Please input  a .json file.', 10)
 	}
 })
 function downloadFile() {
@@ -2137,6 +2612,11 @@ function downloadFile() {
 	counters[0] += jetzt - programmStart
 	programmStart = jetzt
 	counters[1]++
+	counters[17] = holding
+	let actionDescription = lastAction.split("g")
+	counters[19] = parseInt(actionDescription[0])
+	counters[18] = parseInt(actionDescription[1])
+	counters[20] = ~~walkable
 	downloadData.push(waitingStuff)
 	downloadData.push(counters)
 	downloadData.push(playerPos)
@@ -2144,7 +2624,7 @@ function downloadFile() {
 	const blob = new Blob([jsonString], { type: 'application/json' })
 	const link = document.createElement('a')
 	link.href = URL.createObjectURL(blob)
-	link.download = `Speicherpunkt_${counters[1]}.json`
+	link.download = `SavePoint_${counters[1]}.json`
 	link.click()
 }
 window.addEventListener('resize', function () {
@@ -2162,7 +2642,7 @@ window.addEventListener('resize', function () {
 	popupContent.style.fontSize = `${Math.max(Math.min(window.innerWidth, window.innerHeight) * 0.025, 15)}px`
 })
 window.onload = async function () {
-	const bildUrl = "https://wallpapercave.com/wp/V2ZOA5f.png"
+	const bildUrl = "https://cdn-icons-png.flaticon.com/512/94/94766.png"
 	const bild = new Image()
 	function ladeBildAsync(url) {
 		return new Promise((resolve, reject) => {
@@ -2213,9 +2693,19 @@ function showPopup(textInput, time) {
 	popup.style.visibility = 'visible'
 	setTimeout(() => {
 		popup.style.opacity = 1
-}, 100)
+	}, 100)
 	stopPopup = setTimeout(() => {
 		popup.style.visibility = 'hidden'
 		popup.style.opacity = 0
 	}, time * 1000)
+}
+function letter(popupData, text, filename) {
+	showPopup(popupData[0], popupData[1])
+	const blob = new Blob([text], { type: 'text/plain' })
+	const url = URL.createObjectURL(blob)
+	const a = document.createElement('a')
+	a.href = url
+	a.download = filename
+	a.click()
+	URL.revokeObjectURL(url)
 }
